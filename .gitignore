@@ -1,0 +1,4 @@
+# 根目录打包产物（下载分发版在 docs/webmold.zip，随站点一起发布）
+/webmold.zip
+*.zip
+!docs/webmold.zip

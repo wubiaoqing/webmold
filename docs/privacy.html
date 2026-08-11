@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebMold 隐私政策</title>
+<meta name="description" content="WebMold 浏览器扩展的隐私政策：本地优先，不收集任何用户数据。">
+<link rel="icon" type="image/png" href="assets/icon128.png">
+<style>
+  :root {
+    --bg: #0b1020;
+    --bg-soft: #121a33;
+    --card: #16203f;
+    --border: rgba(139, 91, 255, 0.18);
+    --text: #e8ecf8;
+    --text-dim: #a4b0d0;
+    --accent: #5b8cff;
+    --accent-2: #8b5bff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px 80px; }
+
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(11, 16, 32, 0.82); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; color: var(--text); }
+  .brand:hover { text-decoration: none; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; }
+  nav a.back { font-size: 14px; color: var(--text-dim); }
+
+  h1 { font-size: 32px; font-weight: 800; margin: 12px 0 6px; letter-spacing: -0.3px; }
+  .meta { color: var(--text-dim); font-size: 13px; margin-bottom: 36px; }
+  h2 { font-size: 20px; font-weight: 700; margin: 40px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h2 .no { color: var(--accent); margin-right: 8px; }
+  p, li { color: var(--text-dim); font-size: 15px; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin: 18px 0; }
+  .card b { color: var(--text); }
+  code { background: rgba(91, 140, 255, 0.14); color: var(--accent); padding: 2px 7px; border-radius: 5px; font-size: 13.5px; }
+  footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; }
+  footer .copy { color: var(--text-dim); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="container">
+    <a class="brand" href="index.html">
+      <img src="assets/icon128.png" alt="WebMold logo">
+      <span>WebMold</span>
+    </a>
+    <a class="back" href="index.html">← 返回主页</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <h1>WebMold 隐私政策</h1>
+  <p class="meta">最后更新日期：2026-08-11</p>
+
+  <div class="card">
+    <p><b>一句话总结：开发者不收集、不存储、不传输你的任何数据。所有数据都留在你自己的浏览器里。</b></p>
+  </div>
+
+  <h2><span class="no">1.</span>开发者收集的数据</h2>
+  <p>本扩展的开发者<b>不收集</b>任何用户数据。本扩展没有任何服务器端、没有账号系统、没有遥测统计，也没有广告。</p>
+
+  <h2><span class="no">2.</span>数据存储</h2>
+  <ul>
+    <li>所有规则、配置、历史记录均存储在用户浏览器本地的 <code>chrome.storage.local</code> 中。</li>
+    <li>用户填写的 API Key / Token 仅保存在浏览器本地，开发者无法访问。</li>
+    <li>卸载扩展后，浏览器会在符合其清理规则时移除相关本地数据。</li>
+  </ul>
+
+  <h2><span class="no">3.</span>数据的处理与传输</h2>
+  <p>
+    当用户主动使用「生成定制」功能时，扩展会把当前页面的<b>标题、DOM 结构摘要</b>以及<b>用户输入的需求</b>，
+    发送到用户在设置页自行配置并授权的第三方 AI 模型服务（OpenAI 兼容接口），以生成 CSS/JS 规则。
+    开发者不参与也不存储这些请求内容。
+  </p>
+
+  <h2><span class="no">4.</span>第三方服务</h2>
+  <p>
+    本扩展依赖用户自行配置的第三方 AI 模型服务（如腾讯云 Token Plan、DeepSeek、Kimi 等）。
+    该服务的数据处理行为由其自身隐私政策约束，与开发者无关。请在使用前阅读你所选服务的隐私政策。
+  </p>
+
+  <h2><span class="no">5.</span>用户控制</h2>
+  <ul>
+    <li>用户可随时在设置页删除、修改或导出自己的规则与配置。</li>
+    <li>用户可随时卸载本扩展，停止一切数据处理。</li>
+  </ul>
+
+  <h2><span class="no">6.</span>联系方式</h2>
+  <p>如有隐私相关问题，可通过 GitHub 仓库 issue 联系开发者。</p>
+
+  <p class="meta" style="margin-top: 48px;">本隐私政策随扩展版本更新，如内容变更将在此页面说明。</p>
+</div>
+
+<footer>
+  <div class="copy">© 2026 WebMold · <a href="index.html">返回主页</a></div>
+</footer>
+
+</body>
+</html>

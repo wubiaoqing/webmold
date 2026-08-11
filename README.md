@@ -125,3 +125,24 @@ harness 内核集中承载了循环/超时/重试/事件等能力，后续要增
 - Service Worker 生命周期限制下，超长 agent 任务需靠持续的网络/消息活动维持存活（当前每步都有活动，通常无碍）。
 - 强 SPA 站点的动态加载时机需 agent 在 JS 中自行处理（prompt 已引导使用 MutationObserver）。
 - 暂未做 iframe（`all_frames: false`）内的注入。
+
+## 落地页站点（GitHub Pages）
+
+`docs/` 目录是产品的落地页站点，包含产品介绍、安装引导与隐私政策，可直接通过 GitHub Pages 免费托管：
+
+- `docs/index.html` —— 产品主页（介绍 + 安装引导 + 隐私安全）
+- `docs/privacy.html` —— 隐私政策（Chrome 商店提审时可直接引用其 URL）
+- `docs/webmold.zip` —— 分发给用户的安装包（与根目录 zip 同步更新）
+- `docs/assets/` —— 图标资源（来自 `assets/`）
+
+### 开启方式（约 1 分钟）
+
+1. 把本仓库推送到 GitHub（私有 / 公开均可）。
+2. 进入仓库 **Settings → Pages**。
+3. 在 **Build and deployment** 中选择 `Deploy from a branch`。
+4. Branch 选择 `master`，目录选择 `/docs`，点击 **Save**。
+5. 等待 1~2 分钟，页面会给出站点地址（`https://<你的用户名>.github.io/<仓库名>/`）。
+
+### 更新安装包
+
+每次发布新版时，把重新打包的 `webmold.zip` 覆盖到 `docs/webmold.zip` 并推送即可，主页下载链接自动指向最新版。
