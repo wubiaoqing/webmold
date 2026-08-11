@@ -11,34 +11,25 @@
       <header class="hero">
         <div class="brand">
           <span class="logo" aria-label="WebMold" role="img">
-            <svg viewBox="0 0 48 48" width="56" height="56" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="wm-bg" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#5b8cff" />
-                  <stop offset="1" stop-color="#8b5bff" />
-                </linearGradient>
-                <linearGradient id="wm-brush" x1="30" y1="14" x2="40" y2="24" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#ffd15b" />
-                  <stop offset="1" stop-color="#ff8f5b" />
-                </linearGradient>
-              </defs>
-              <rect class="wm-canvas" x="6" y="8" width="36" height="32" rx="7" fill="url(#wm-bg)" />
+            <svg viewBox="0 0 48 48" width="52" height="52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- 浏览器窗口：寓意「网页」 -->
+              <rect x="6" y="8" width="36" height="32" rx="6" fill="#3a6fe0" />
+              <!-- 标题栏三个圆点 -->
               <circle cx="12.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.9" />
               <circle cx="17.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.6" />
               <circle cx="22.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.4" />
+              <!-- 画布上被「塑形」的内容块 -->
               <rect x="12" y="21" width="14" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.85" />
               <rect x="12" y="27" width="20" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.55" />
               <rect x="12" y="33" width="10" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.4" />
-              <g class="wm-brush">
-                <rect x="30.5" y="10" width="4.2" height="16" rx="2.1" transform="rotate(38 32.6 18)" fill="url(#wm-brush)" />
-                <path d="M38.4 28.6l-4.6-3.6 2.2-2.84.6 3.6a1.8 1.8 0 0 1-2.2 2.8z" fill="#fff" fill-opacity="0.95" />
-                <path class="wm-spark" d="M41 30l.71.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z" fill="#ffe27a" />
-              </g>
+              <!-- 笔刷：寓意「重塑网页」 -->
+              <rect x="30.5" y="10" width="4.2" height="16" rx="2.1" transform="rotate(38 32.6 18)" fill="#d29922" />
+              <path d="M38.4 28.6l-4.6-3.6 2.2-2.84.6 3.6a1.8 1.8 0 0 1-2.2 2.8z" fill="#fff" fill-opacity="0.95" />
             </svg>
           </span>
           <span class="name">WebMold</span>
         </div>
-        <p class="slogan">说一句, 网页听你的 · Say it, Shape it</p>
+        <p class="slogan">browser extension · local-first · v0.1.0</p>
         <h1>用一句话，把任意网站改成你想要的样子</h1>
       </header>
 
@@ -50,7 +41,7 @@
 
         <div class="case-grid">
           <div class="case-card">
-        <div class="case-title"><span class="case-emoji" aria-hidden="true">🚫</span>去广告 · 去干扰</div>
+        <div class="case-title">去广告 · 去干扰</div>
             <ul>
       <li>隐藏顶部横幅广告和右侧悬浮推广</li>
       <li>去掉「猜你喜欢 / 相关推荐」模块</li>
@@ -59,7 +50,7 @@
           </div>
 
       <div class="case-card">
-            <div class="case-title"><span class="case-emoji" aria-hidden="true">📖</span>阅读体验优化</div>
+            <div class="case-title">阅读体验优化</div>
  <ul>
      <li>给这个网站加个夜间模式，深灰背景浅色文字</li>
      <li>正文字体调到 18px、行高 1.8，宽度限制 800px 居中</li>
@@ -68,7 +59,7 @@
       </div>
 
           <div class="case-card">
-            <div class="case-title"><span class="case-emoji" aria-hidden="true">✨</span>信息增强</div>
+            <div class="case-title">信息增强</div>
      <ul>
   <li>在每个视频卡片上显示时长和播放量</li>
       <li>商品列表价格加粗放大，低于 100 元标红</li>
@@ -77,7 +68,7 @@
           </div>
 
           <div class="case-card">
-          <div class="case-title"><span class="case-emoji" aria-hidden="true">⚙️</span>功能增强</div>
+          <div class="case-title">功能增强</div>
      <ul>
         <li>加一个「回到顶部」悬浮按钮</li>
    <li>滚动到底部时自动加载下一页</li>
@@ -86,7 +77,7 @@
           </div>
 
           <div class="case-card">
-            <div class="case-title"><span class="case-emoji" aria-hidden="true">🧩</span>布局重排 · 精简</div>
+            <div class="case-title">布局重排 · 精简</div>
    <ul>
               <li>把后台系统左侧的侧边栏默认折叠起来</li>
    <li>只保留导航里的「首页 / 我的」，其余隐藏</li>
@@ -95,7 +86,7 @@
   </div>
 
           <div class="case-card">
-      <div class="case-title"><span class="case-emoji" aria-hidden="true">⚡</span>特定站点提效</div>
+      <div class="case-title">特定站点提效</div>
   <ul>
  <li>视频站：记住清晰度、自动跳过片头</li>
   <li>电商站：隐藏已售罄商品，只看有货的</li>

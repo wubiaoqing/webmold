@@ -10,20 +10,10 @@
     <header class="topbar">
       <div class="brand">
         <span class="logo" aria-label="WebMold" role="img">
-          <svg viewBox="0 0 48 48" width="30" height="30" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="wm-bg" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#5b8cff" />
-                <stop offset="1" stop-color="#8b5bff" />
-              </linearGradient>
-              <linearGradient id="wm-brush" x1="30" y1="14" x2="40" y2="24" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#ffd15b" />
-                <stop offset="1" stop-color="#ff8f5b" />
-              </linearGradient>
-            </defs>
-            <!-- 画布：一个圆角浏览器窗口，寓意「网页」 -->
-            <rect class="wm-canvas" x="6" y="8" width="36" height="32" rx="7" fill="url(#wm-bg)" />
-            <!-- 浏览器标题栏三个圆点 -->
+          <svg viewBox="0 0 48 48" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- 浏览器窗口：寓意「网页」 -->
+            <rect x="6" y="8" width="36" height="32" rx="6" fill="#3a6fe0" />
+            <!-- 标题栏三个圆点 -->
             <circle cx="12.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.9" />
             <circle cx="17.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.6" />
             <circle cx="22.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.4" />
@@ -31,29 +21,25 @@
             <rect x="12" y="21" width="14" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.85" />
             <rect x="12" y="27" width="20" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.55" />
             <rect x="12" y="33" width="10" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.4" />
-            <!-- 魔法塑形笔刷：斜插向画布，寓意「重塑网页」 -->
-            <g class="wm-brush">
-              <rect x="30.5" y="10" width="4.2" height="16" rx="2.1" transform="rotate(38 32.6 18)" fill="url(#wm-brush)" />
-              <path d="M38.4 28.6l-4.6-3.6 2.2-2.84.6 3.6a1.8 1.8 0 0 1-2.2 2.8z" fill="#fff" fill-opacity="0.95" />
-              <!-- 笔尖闪光粒子 -->
-              <path class="wm-spark" d="M41 30l.71.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z" fill="#ffe27a" />
-            </g>
+            <!-- 笔刷：寓意「重塑网页」 -->
+            <rect x="30.5" y="10" width="4.2" height="16" rx="2.1" transform="rotate(38 32.6 18)" fill="#d29922" />
+            <path d="M38.4 28.6l-4.6-3.6 2.2-2.84.6 3.6a1.8 1.8 0 0 1-2.2 2.8z" fill="#fff" fill-opacity="0.95" />
           </svg>
         </span>
- <span class="brand-text">
+        <span class="brand-text">
           <span class="brand-name">WebMold</span>
-          <span class="brand-slogan">说一句, 网页听你的 · Say it, Shape it</span>
+          <span class="brand-slogan">v0.1.0 · 本地优先</span>
         </span>
       </div>
       <div class="domain-badge" id="domainBadge">—</div>
-      <button class="icon-btn" id="helpBtn" title="使用指引/ 案例">?</button>
-      <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
+      <button class="icon-btn" id="helpBtn" title="使用指引 / 案例">?</button>
+      <button class="icon-btn" id="settingsBtn" title="设置">设置</button>
     </header>
 
     <main class="content">
       <!-- 未配置模型时的引导提示条 -->
       <div id="setupBanner" class="setup-banner hidden">
-        <span class="sb-icon">⚡</span>
+        <span class="sb-icon">!</span>
         <div class="sb-text">
           <b>还差一步就能用了</b>
           <span>请先配置模型（BaseURL / API Key / 模型名），否则无法生成定制。</span>
@@ -78,7 +64,7 @@
         <div class="composer">
           <!-- 已选中的页面元素（作为对话上下文），可删除 -->
           <div id="pickedChip" class="picked-chip hidden">
-            <span class="pc-icon">◎</span>
+            <span class="pc-icon">#</span>
             <span id="pickedText" class="pc-text"></span>
             <button id="clearPickBtn" class="pc-clear" title="移除所选元素">×</button>
           </div>
@@ -144,7 +130,7 @@
       <section class="panel">
   <div class="list-head">
       <label class="section-label">本站已保存的规则</label>
-          <button id="refreshBtn" class="icon-btn" title="刷新">⟳</button>
+          <button id="refreshBtn" class="icon-btn" title="刷新">刷新</button>
         </div>
         <ul id="ruleList" class="rule-list">
  <li class="empty" id="emptyHint">暂无规则</li>

@@ -1,14 +1,14 @@
 :root {
-  --bg: #0f1117;
-  --card: #171a23;
-  --input: #1e222d;
-  --border: #2a2f3a;
-  --text: #e6e8ee;
-  --muted: #8b90a0;
-  --primary: #5b8cff;
-  --primary-hover: #4a7bf0;
-  --ok: #3ecf8e;
-  --danger: #ff5b6a;
+  --bg: #ffffff;
+  --card: #ffffff;
+  --input: #f6f8fa;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --muted: #59636e;
+  --primary: #3a6fe0;
+  --primary-hover: #2e5cc0;
+  --ok: #1a7f37;
+  --danger: #cf222e;
 }
 
 * {
@@ -38,8 +38,8 @@ h1 {
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-padding: 20px;
+  border-radius: 8px;
+  padding: 20px;
   margin-bottom: 20px;
 }
 
@@ -81,7 +81,7 @@ input:not([type]) {
   width: 100%;
   background: var(--input);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--text);
   padding: 9px 12px;
   font-size: 14px;
@@ -104,7 +104,7 @@ input:focus {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
 }
@@ -135,7 +135,7 @@ select {
   width: 100%;
   background: var(--input);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--text);
   padding: 9px 12px;
   font-size: 14px;

@@ -308,20 +308,21 @@ function bindEvents() {
   });
 
   // 自动跟随：用户主动向上滚动（滚轮上滑 / 触屏下滑查看上文 / 键盘上翻）即暂停跟随；
-  // 一旦滚回底部（scroll 事件判定 isNearBottom）立即恢复。
+  // 一旦任一滚动容器滚回底部（scroll 事件判定 isNearBottom）立即恢复。
   // 程序滚动总是把内容带到最新底部，isNearBottom 恒为 true，不会被误判成用户上滚，
   // 因此无需再用标记区分程序滚动与用户滚动（避免程序滚动被吞导致跟随失效）。
-  els.conversation.addEventListener(
-    'wheel',
-    (e) => {
-      if (e.deltaY < 0) autoFollow = false;
-    },
-    { passive: true }
-  );
-  els.conversation.addEventListener('scroll', () => {
-    if (isNearBottom(els.conversation)) autoFollow = true;
-  });
+  // 用捕获阶段统一监听 mainContent 内所有滚动容器（思考流 think-stream / 运行过程
+  // agent-trace / 对话区 conversation / 整页 main.content）。否则在内层容器（如思考流）
+  // 内滚回底部时，外层不产生 scroll 事件，跟随会一直暂停、无法恢复。
   if (els.mainContent) {
+    // 暂停：任何位置滚轮上滑（capture 保证内层容器如思考流的滚动也能命中）
+    els.mainContent.addEventListener(
+      'wheel',
+      (e) => {
+        if (e.deltaY < 0) autoFollow = false;
+      },
+      { passive: true, capture: true }
+    );
     // 触屏滑动：手指下移 = 查看更早内容，暂停跟随
     let touchY = 0;
     els.mainContent.addEventListener(
@@ -340,9 +341,27 @@ function bindEvents() {
       },
       { passive: true }
     );
-    // 对话较短、整页容器可滚动时，滚回底部同样恢复跟随
-    els.mainContent.addEventListener('scroll', () => {
-      if (isNearBottom(els.mainContent)) autoFollow = true;
+    // 恢复：任一滚动容器滚回底部即恢复跟随（scroll 事件不冒泡，需 capture 才能收到子容器的滚动）
+    const isFollowScrollTarget = (el) =>
+      el === els.mainContent ||
+      el === els.conversation ||
+      el.classList.contains('think-stream') ||
+      el.classList.contains('agent-trace');
+    els.mainContent.addEventListener(
+      'scroll',
+      (e) => {
+        const t = e.target;
+        if (t instanceof Element && isFollowScrollTarget(t) && isNearBottom(t)) autoFollow = true;
+      },
+      true
+    );
+  } else {
+    // 兜底：极端情况下 main 容器缺失，退化为仅在对话区监听
+    els.conversation.addEventListener('wheel', (e) => {
+      if (e.deltaY < 0) autoFollow = false;
+    });
+    els.conversation.addEventListener('scroll', () => {
+      if (isNearBottom(els.conversation)) autoFollow = true;
     });
   }
   // 键盘滚动（↑/PageUp/Home）也会暂停跟随（输入框内不受影响）

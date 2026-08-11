@@ -1,14 +1,15 @@
 :root {
-  --bg: #0f1117;
-  --panel: #171a23;
-  --panel-2: #1e222d;
-  --border: #2a2f3a;
-  --text: #e6e8ee;
-  --muted: #8b90a0;
-  --primary: #5b8cff;
-  --primary-hover: #4a7bf0;
-  --ok: #3ecf8e;
-  --radius: 12px;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f6f8fa;
+  --border: #d0d7de;
+  --border-soft: #eaeef2;
+  --text: #1f2328;
+  --muted: #59636e;
+  --primary: #3a6fe0;
+  --primary-hover: #2e5cc0;
+  --ok: #1a7f37;
+  --radius: 8px;
 }
 
 * {
@@ -19,7 +20,7 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Microsoft YaHei', sans-serif;
-  background: radial-gradient(1200px 600px at 50% -10%, #1a2030 0%, var(--bg) 55%);
+  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.6;
@@ -38,8 +39,6 @@ body {
 }
 
 .brand {
-  /* 用 flex 而非 inline-flex：让品牌行独占一行居中，
-     避免与同为行内级的 .slogan 徽章挤到同一行。 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,102 +53,18 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 0;
-  filter: drop-shadow(0 3px 10px rgba(91, 140, 255, 0.4));
 }
 .brand .logo svg {
   display: block;
-  animation: wm-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both,
-    wm-float 4.5s ease-in-out 0.7s infinite;
-  transform-origin: 24px 40px;
-}
-.brand .logo .wm-brush {
-  transform-origin: 36px 26px;
-  animation: wm-brush-idle 4.5s ease-in-out 0.7s infinite;
-}
-.brand .logo .wm-spark {
-  transform-origin: 41px 32px;
-  animation: wm-spark 2.4s ease-in-out 0.9s infinite;
-}
-.brand:hover .logo .wm-brush {
-  animation: wm-brush-hover 0.9s ease-in-out;
-}
-
-@keyframes wm-pop {
-  0% {
-    transform: scale(0.4) rotate(-12deg);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1) rotate(0);
-    opacity: 1;
-  }
-}
-@keyframes wm-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0);
-  }
-  50% {
-    transform: translateY(-2px) rotate(-1.5deg);
-  }
-}
-@keyframes wm-brush-idle {
-  0%,
-  88%,
-  100% {
-    transform: rotate(0);
-  }
-  94% {
-    transform: rotate(-7deg) translateY(-1px);
-  }
-}
-@keyframes wm-brush-hover {
-  0% {
-    transform: rotate(0);
-  }
-  30% {
-    transform: rotate(-10deg) translate(-1px, -2px);
-  }
-  60% {
-    transform: rotate(6deg) translate(1px, 1px);
-  }
-  100% {
-    transform: rotate(0);
-  }
-}
-@keyframes wm-spark {
-  0%,
-  60%,
-  100% {
-    opacity: 0;
-    transform: scale(0.4) rotate(0);
-  }
-  75% {
-    opacity: 1;
-    transform: scale(1.1) rotate(25deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .brand .logo svg,
-  .brand .logo .wm-brush,
-  .brand .logo .wm-spark {
-    animation: none !important;
-  }
 }
 
 .slogan {
-  /* 块级 + 自动左右外边距，让徽章独占一行并水平居中，
-     不依赖父级 text-align，避免与品牌行并排。 */
   display: table;
   margin: 0 auto 16px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
-  border-radius: 999px;
-  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .hero h1 {
@@ -188,13 +103,14 @@ body {
   flex: 0 0 32px;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius);
   background: var(--primary);
   color: #fff;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 14px;
 }
 
 .step .body {
@@ -230,7 +146,7 @@ body {
 .examples span {
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   padding: 4px 12px;
   font-size: 13px;
   color: var(--text);
@@ -269,12 +185,11 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px 18px;
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .case-card:hover {
   border-color: var(--primary);
-  transform: translateY(-2px);
 }
 
 .case-title {
@@ -284,11 +199,6 @@ body {
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 10px;
-}
-
-.case-emoji {
-  font-size: 18px;
-  line-height: 1;
 }
 
 .case-card ul {
@@ -309,11 +219,12 @@ body {
 }
 
 .case-card li::before {
-  content: '“';
+  content: '>';
   position: absolute;
   left: 0;
   top: 0;
   color: var(--primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 700;
 }
 
