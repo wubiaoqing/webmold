@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebMold 设置</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="container">
+  <h1>WebMold 设置</h1>
+
+      <section class="card">
+ <h2>模型接入（OpenAI 兼容）</h2>
+   <p class="hint">
+          支持标准 OpenAI 及任何兼容 Chat Completions 的服务。API Key / 代理 token
+          仅存储在本地浏览器中。
+        </p>
+
+        <label>云厂商</label>
+        <select id="providerSelect">
+          <option value="">自定义 / 其他</option>
+        </select>
+        <p class="hint">
+          选择预设云厂商会自动填入 BaseURL 与默认 API Key，并展示该厂商支持的模型。
+          目前内置腾讯云 Token Plan，更多厂商（如阿里云）将陆续接入。
+        </p>
+
+        <label>BaseURL</label>
+        <input id="baseUrl" placeholder="https://api.openai.com/v1" />
+        <p class="hint">
+          填到 <code>/chat/completions</code> 之前的部分，例如 OpenAI 为 <code>https://api.openai.com/v1</code>。
+        </p>
+
+        <label>API Key / 代理 Token</label>
+        <input id="apiKey" type="password" placeholder="sk-..." />
+
+        <label>模型名称</label>
+        <select id="modelSelect">
+          <option value="">— 选择云厂商后可见 —</option>
+        </select>
+        <input id="model" placeholder="自定义模型名（私有服务用 server:212345）" />
+        <p class="hint">
+          从上方下拉选择会自动填入下方输入框；也可手动输入下拉中没有的模型或私有服务
+          <code>server:&lt;serverId&gt;</code>。带 <code>[工具]</code> 标记的模型支持
+      function calling（本扩展 agent 依赖此能力，建议优先选择）。
+        </p>
+
+        <details class="advanced">
+          <summary>高级设置</summary>
+
+          <label>温度（0 ~ 2，越低越稳定）</label>
+          <input id="temperature" type="number" step="0.1" min="0" max="2" />
+
+          <label>top_p（0 ~ 1，可选；0 表示不启用）</label>
+          <input id="topP" type="number" step="0.05" min="0" max="1" />
+
+          <label>最大输出 tokens（max_tokens，可选；0 表示用模型最大值）</label>
+          <input id="maxTokens" type="number" step="1" min="0" />
+          <p class="hint">
+            gpt-5 及后续版本会自动映射为 <code>max_completion_tokens</code>；留 0 时自动使用当前模型允许的最大输出上限，避免长规则的 JS/CSS 被截断。填入的值不会超过模型能力上限。
+          </p>
+
+          <label>模型清单远程更新源（URL，可选）</label>
+          <input id="modelsSourceUrl" type="text" placeholder="https://example.com/providers.json" />
+          <p class="hint">
+            填写后，云厂商与模型列表可独立于扩展版本更新（如新增云厂商 / 模型），无需升级插件；
+            留空则使用扩展内置清单。配置 JSON 格式：
+            <code>{ "version": "...", "providers": [...] }</code>，<code>providers</code>
+            数组结构与内置清单一致（含 id / name / baseUrl / models）。
+          </p>
+          <div class="row">
+            <button id="checkModelsUpdate" class="btn">检查更新</button>
+            <span id="modelsStatus" class="status"></span>
+          </div>
+        </details>
+
+        <div class="row">
+ <button id="saveLlm" class="btn primary">保存</button>
+          <button id="testLlm" class="btn">测试连接</button>
+          <span id="llmStatus" class="status"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>数据管理</h2>
+        <div class="row">
+ <button id="exportBtn" class="btn">导出全部规则</button>
+          <button id="importBtn" class="btn">导入规则</button>
+          <input id="importFile" type="file" accept="application/json" hidden />
+          <span id="dataStatus" class="status"></span>
+     </div>
+      </section>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

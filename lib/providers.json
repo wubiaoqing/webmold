@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "id": "tencent-token-plan",
+      "name": "腾讯云 Token Plan",
+      "baseUrl": "https://api.lkeap.cloud.tencent.com/plan/v3",
+      "models": [
+        { "model": "tc-code-latest", "alias": "Auto", "tool": true, "maxToken": 131072 },
+        { "model": "minimax-m2.5", "alias": "MiniMax-M2.5", "tool": true, "maxToken": 131072 },
+        { "model": "minimax-m2.7", "alias": "MiniMax-M2.7", "tool": true, "maxToken": 131072 },
+        { "model": "glm-5", "alias": "GLM-5", "tool": true, "maxToken": 131072 },
+        { "model": "glm-5.1", "alias": "GLM-5.1", "tool": true, "maxToken": 131072 },
+        { "model": "glm-5.2", "alias": "GLM-5.2", "tool": true, "maxToken": 131072 },
+        { "model": "kimi-k2.5", "alias": "Kimi-K2.5", "tool": true, "maxToken": 131072 },
+        { "model": "deepseek-v4-flash-202605", "alias": "DeepSeek-V4-Flash 原厂直供", "tool": true, "maxToken": 131072 },
+        { "model": "deepseek-v4-pro-202606", "alias": "DeepSeek-V4-Pro 原厂直供", "tool": true, "maxToken": 131072 }
+      ]
+    }
+  ]
+}

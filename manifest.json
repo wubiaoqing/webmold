@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "114",
+  "name": "WebMold - 说一句, 网页听你的",
+  "version": "0.1.0",
+  "description": "用自然语言按需定制任意网站的功能与 UI，规则按域名持久化存储。",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "sidePanel",
+    "tabs",
+    "webNavigation",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content-script.js"],
+  "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+  "default_title": "WebMold"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "options_page": "options/options.html",
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  }
+}

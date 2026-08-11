@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>欢迎使用 WebMold</title>
+    <link rel="stylesheet" href="welcome.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="hero">
+        <div class="brand">
+          <span class="logo" aria-label="WebMold" role="img">
+            <svg viewBox="0 0 48 48" width="56" height="56" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="wm-bg" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#5b8cff" />
+                  <stop offset="1" stop-color="#8b5bff" />
+                </linearGradient>
+                <linearGradient id="wm-brush" x1="30" y1="14" x2="40" y2="24" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#ffd15b" />
+                  <stop offset="1" stop-color="#ff8f5b" />
+                </linearGradient>
+              </defs>
+              <rect class="wm-canvas" x="6" y="8" width="36" height="32" rx="7" fill="url(#wm-bg)" />
+              <circle cx="12.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.9" />
+              <circle cx="17.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.6" />
+              <circle cx="22.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.4" />
+              <rect x="12" y="21" width="14" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.85" />
+              <rect x="12" y="27" width="20" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.55" />
+              <rect x="12" y="33" width="10" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.4" />
+              <g class="wm-brush">
+                <rect x="30.5" y="10" width="4.2" height="16" rx="2.1" transform="rotate(38 32.6 18)" fill="url(#wm-brush)" />
+                <path d="M38.4 28.6l-4.6-3.6 2.2-2.84.6 3.6a1.8 1.8 0 0 1-2.2 2.8z" fill="#fff" fill-opacity="0.95" />
+                <path class="wm-spark" d="M41 30l.71.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z" fill="#ffe27a" />
+              </g>
+            </svg>
+          </span>
+          <span class="name">WebMold</span>
+        </div>
+        <p class="slogan">说一句, 网页听你的 · Say it, Shape it</p>
+        <h1>用一句话，把任意网站改成你想要的样子</h1>
+      </header>
+
+      <section class="cases">
+        <div class="cases-head">
+   <h2>能用它做什么？</h2>
+          <p class="cases-sub">下面是一些常见玩法，点开侧边栏直接照着描述即可 —— 越具体，生成越准。</p>
+   </div>
+
+        <div class="case-grid">
+          <div class="case-card">
+        <div class="case-title"><span class="case-emoji" aria-hidden="true">🚫</span>去广告 · 去干扰</div>
+            <ul>
+      <li>隐藏顶部横幅广告和右侧悬浮推广</li>
+      <li>去掉「猜你喜欢 / 相关推荐」模块</li>
+              <li>关掉自动播放视频、移除右下角客服弹窗</li>
+            </ul>
+          </div>
+
+      <div class="case-card">
+            <div class="case-title"><span class="case-emoji" aria-hidden="true">📖</span>阅读体验优化</div>
+ <ul>
+     <li>给这个网站加个夜间模式，深灰背景浅色文字</li>
+     <li>正文字体调到 18px、行高 1.8，宽度限制 800px 居中</li>
+    <li>去掉所有动画和渐变，界面越简洁越好</li>
+          </ul>
+      </div>
+
+          <div class="case-card">
+            <div class="case-title"><span class="case-emoji" aria-hidden="true">✨</span>信息增强</div>
+     <ul>
+  <li>在每个视频卡片上显示时长和播放量</li>
+      <li>商品列表价格加粗放大，低于 100 元标红</li>
+        <li>在每条搜索结果标题后显示它的域名</li>
+     </ul>
+          </div>
+
+          <div class="case-card">
+          <div class="case-title"><span class="case-emoji" aria-hidden="true">⚙️</span>功能增强</div>
+     <ul>
+        <li>加一个「回到顶部」悬浮按钮</li>
+   <li>滚动到底部时自动加载下一页</li>
+     <li>把页面所有外链都改成新标签页打开</li>
+        </ul>
+          </div>
+
+          <div class="case-card">
+            <div class="case-title"><span class="case-emoji" aria-hidden="true">🧩</span>布局重排 · 精简</div>
+   <ul>
+              <li>把后台系统左侧的侧边栏默认折叠起来</li>
+   <li>只保留导航里的「首页 / 我的」，其余隐藏</li>
+       <li>把双栏布局改成单栏，只留主内容区</li>
+            </ul>
+  </div>
+
+          <div class="case-card">
+      <div class="case-title"><span class="case-emoji" aria-hidden="true">⚡</span>特定站点提效</div>
+  <ul>
+ <li>视频站：记住清晰度、自动跳过片头</li>
+  <li>电商站：隐藏已售罄商品，只看有货的</li>
+ <li>文档站：右侧加一个当前页大纲目录</li>
+  </ul>
+   </div>
+ </div>
+      </section>
+
+      <section class="steps">
+        <ol>
+     <li class="step">
+   <div class="idx">1</div>
+            <div class="body">
+ <h3>配置模型（必做）</h3>
+              <p>
+       在设置页填写 <b>BaseURL</b>、<b>API Key</b>、<b>模型名称</b>，点「测试连接」确认可用。兼容 OpenAI Chat Completions 的服务均可，建议选支持 function calling 的模型。
+     </p>
+            </div>
+          </li>
+        <li class="step">
+         <div class="idx">2</div>
+         <div class="body">
+              <h3>打开侧边栏，描述需求</h3>
+        <p>点工具栏 WebMold 图标打开侧边栏，用自然语言说出你的定制（参考上面的常见玩法），点「生成定制」。</p>
+            </div>
+          </li>
+        <li class="step">
+            <div class="idx">3</div>
+            <div class="body">
+         <h3>预览、保存，自动生效</h3>
+  <p>预览生成的 CSS/JS（可微调）→ 选生效范围 → 保存。之后访问该网站自动应用。</p>
+   </div>
+     </li>
+        </ol>
+      </section>
+
+    <section class="cta">
+        <button id="openOptions" class="btn primary">去配置模型</button>
+        <a class="btn ghost" href="#" id="skipBtn">先随便看看</a>
+      </section>
+
+      <section class="note">
+        <h4>安全提示</h4>
+        <p>
+          最终生成的 JS 会在页面主世界执行，等同于运行第三方脚本。<b>保存前请务必预览并检查生成的代码</b>。
+          API Key 仅存储在浏览器本地，不会上传到除你配置服务之外的任何地方。
+        </p>
+      </section>
+    </main>
+
+    <script type="module" src="welcome.js"></script>
+  </body>
+</html>

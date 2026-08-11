@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebMold</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-label="WebMold" role="img">
+          <svg viewBox="0 0 48 48" width="30" height="30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="wm-bg" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#5b8cff" />
+                <stop offset="1" stop-color="#8b5bff" />
+              </linearGradient>
+              <linearGradient id="wm-brush" x1="30" y1="14" x2="40" y2="24" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#ffd15b" />
+                <stop offset="1" stop-color="#ff8f5b" />
+              </linearGradient>
+            </defs>
+            <!-- 画布：一个圆角浏览器窗口，寓意「网页」 -->
+            <rect class="wm-canvas" x="6" y="8" width="36" height="32" rx="7" fill="url(#wm-bg)" />
+            <!-- 浏览器标题栏三个圆点 -->
+            <circle cx="12.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.9" />
+            <circle cx="17.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.6" />
+            <circle cx="22.5" cy="14" r="1.6" fill="#fff" fill-opacity="0.4" />
+            <!-- 画布上被「塑形」的内容块 -->
+            <rect x="12" y="21" width="14" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.85" />
+            <rect x="12" y="27" width="20" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.55" />
+            <rect x="12" y="33" width="10" height="3.2" rx="1.6" fill="#fff" fill-opacity="0.4" />
+            <!-- 魔法塑形笔刷：斜插向画布，寓意「重塑网页」 -->
+            <g class="wm-brush">
+              <rect x="30.5" y="10" width="4.2" height="16" rx="2.1" transform="rotate(38 32.6 18)" fill="url(#wm-brush)" />
+              <path d="M38.4 28.6l-4.6-3.6 2.2-2.84.6 3.6a1.8 1.8 0 0 1-2.2 2.8z" fill="#fff" fill-opacity="0.95" />
+              <!-- 笔尖闪光粒子 -->
+              <path class="wm-spark" d="M41 30l.71.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7z" fill="#ffe27a" />
+            </g>
+          </svg>
+        </span>
+ <span class="brand-text">
+          <span class="brand-name">WebMold</span>
+          <span class="brand-slogan">说一句, 网页听你的 · Say it, Shape it</span>
+        </span>
+      </div>
+      <div class="domain-badge" id="domainBadge">—</div>
+      <button class="icon-btn" id="helpBtn" title="使用指引/ 案例">?</button>
+      <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
+    </header>
+
+    <main class="content">
+      <!-- 未配置模型时的引导提示条 -->
+      <div id="setupBanner" class="setup-banner hidden">
+        <span class="sb-icon">⚡</span>
+        <div class="sb-text">
+          <b>还差一步就能用了</b>
+          <span>请先配置模型（BaseURL / API Key / 模型名），否则无法生成定制。</span>
+        </div>
+        <button id="setupBtn" class="btn primary mini">去配置</button>
+      </div>
+
+      <!-- 聊天区：对话展示 + 输入框合为一体，减少视觉割裂 -->
+      <section class="chat">
+        <!-- 常驻工具栏：不依赖是否已有对话，进入侧边栏即可看到「历史会话」入口 -->
+        <div class="chat-toolbar" id="chatToolbar">
+          <span class="chat-title" id="chatTitle">对话</span>
+          <div class="conv-actions">
+            <button id="historyBtn" class="btn ghost mini" title="查看历史会话">历史会话</button>
+            <button id="backToLiveBtn" class="btn ghost mini hidden" title="返回当前会话">← 返回</button>
+          </div>
+        </div>
+        <!-- 会话对话区：按「一问一答」沉淀本次会话的多轮问答 -->
+        <div id="conversation" class="conversation"></div>
+
+        <!-- 输入框：直接贴在对话下方 -->
+        <div class="composer">
+          <!-- 已选中的页面元素（作为对话上下文），可删除 -->
+          <div id="pickedChip" class="picked-chip hidden">
+            <span class="pc-icon">◎</span>
+            <span id="pickedText" class="pc-text"></span>
+            <button id="clearPickBtn" class="pc-clear" title="移除所选元素">×</button>
+          </div>
+          <textarea
+            id="promptInput"
+            class="prompt-input"
+            rows="3"
+            placeholder="描述你想对这个网站做的定制，例如：把顶部广告栏隐藏掉；加一个夜间模式切换按钮…"
+          ></textarea>
+          <div class="composer-actions">
+            <button id="generateBtn" class="btn primary">生成定制</button>
+            <button id="pickElementBtn" class="btn ghost" title="在页面上选择一个元素作为对话上下文">选择元素</button>
+            <button id="stopBtn" class="btn ghost hidden">停止</button>
+            <button id="newSessionBtn" class="btn ghost" title="清空本次会话上下文，开始新对话">新对话</button>
+            <span id="genStatus" class="status"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 历史会话列表：点击某条可在对话区回放其完整对话过程 -->
+      <section class="panel hidden" id="historyPanel">
+        <div class="list-head">
+          <label class="section-label">历史会话（本站）</label>
+          <button id="clearHistoryBtn" class="btn ghost mini" title="清空本站历史会话">清空</button>
+        </div>
+        <ul id="historyList" class="history-list">
+          <li class="empty">暂无历史会话</li>
+        </ul>
+      </section>
+
+      <!-- 生成结果预览区 -->
+      <section class="panel hidden" id="resultPanel">
+  <div class="result-head">
+          <input id="resultTitle" class="result-title" placeholder="规则标题" />
+        </div>
+        <p id="resultExplain" class="explain"></p>
+
+        <div class="code-tabs">
+          <button class="tab active" data-tab="css">CSS</button>
+          <button class="tab" data-tab="js">JS</button>
+     </div>
+   <textarea id="cssCode" class="code-area" spellcheck="false"></textarea>
+        <textarea id="jsCode" class="code-area hidden" spellcheck="false"></textarea>
+
+        <div class="match-row">
+       <label>生效范围</label>
+      <select id="matchType">
+      <option value="all">整个网站（该域名所有页面）</option>
+   <option value="prefix">当前 URL 前缀匹配</option>
+    <option value="exact">仅当前精确 URL</option>
+          </select>
+        </div>
+
+  <div class="row">
+       <button id="previewBtn" class="btn">预览</button>
+   <button id="clearPreviewBtn" class="btn ghost">清除预览</button>
+        <button id="saveBtn" class="btn primary">保存规则</button>
+   <button id="cancelEditBtn" class="btn ghost">取消</button>
+   </div>
+      </section>
+
+      <!-- 已有规则列表 -->
+      <section class="panel">
+  <div class="list-head">
+      <label class="section-label">本站已保存的规则</label>
+          <button id="refreshBtn" class="icon-btn" title="刷新">⟳</button>
+        </div>
+        <ul id="ruleList" class="rule-list">
+ <li class="empty" id="emptyHint">暂无规则</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
