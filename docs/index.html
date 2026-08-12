@@ -182,6 +182,15 @@
   footer .container { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
   footer .copy { color: var(--text-dim); font-size: 13px; }
   footer .links { display: flex; gap: 18px; font-size: 13.5px; }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 640px) {
+    .container { padding: 0 16px; }
+    /* 窄屏只保留品牌与下载按钮，隐藏文字链接避免溢出 */
+    nav .links { gap: 10px; }
+    nav .links a:not(.btn) { display: none; }
+    nav .btn { padding: 6px 12px; font-size: 12.5px; }
+  }
 </style>
 </head>
 <body>
