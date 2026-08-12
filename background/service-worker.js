@@ -409,11 +409,19 @@ function getHistory(tabId) {
 function pushHistory(tabId, userPrompt, result) {
   const hist = sessions.get(tabId) || [];
   hist.push({ role: 'user', content: String(userPrompt || '').slice(0, 2000) });
-  // 产出摘要：只放标题/说明/代码长度，避免把大段 css/js 塞进后续每一轮上下文
-  const summary =
-    `已生成规则：${result?.title || '未命名规则'}` +
-    (result?.explanation ? `\n说明：${String(result.explanation).slice(0, 500)}` : '') +
-    `\n（含 CSS ${((result?.css || '').length)} 字、JS ${((result?.js || '').length)} 字）`;
+  let summary;
+  if (result?.mode === 'answer') {
+    // 问答类产出：只保留问题与答案摘要，避免把长答案塞进后续每一轮上下文
+    summary =
+      `问答：${String(userPrompt || '').slice(0, 100)}` +
+      `\n回答：${String(result?.answer || result?.explanation || '').slice(0, 500)}`;
+  } else {
+    // 规则类产出：只放标题/说明/代码长度，避免把大段 css/js 塞进后续每一轮上下文
+    summary =
+      `已生成规则：${result?.title || '未命名规则'}` +
+      (result?.explanation ? `\n说明：${String(result.explanation).slice(0, 500)}` : '') +
+      `\n（含 CSS ${((result?.css || '').length)} 字、JS ${((result?.js || '').length)} 字）`;
+  }
   hist.push({ role: 'assistant', content: summary });
   // 只保留最近 N 条
   while (hist.length > MAX_HISTORY_MESSAGES) hist.shift();

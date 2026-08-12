@@ -24,7 +24,7 @@ body {
     'Microsoft YaHei', sans-serif;
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -55,7 +55,7 @@ body {
   font-weight: 600;
 }
 .brand-slogan {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   color: var(--muted);
 }
@@ -76,7 +76,7 @@ body {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   max-width: 160px;
   overflow: hidden;
@@ -89,7 +89,7 @@ body {
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 8px;
   border-radius: var(--radius);
 }
@@ -116,7 +116,7 @@ body {
 
 .section-label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   margin-bottom: 8px;
 }
@@ -141,7 +141,7 @@ body {
 
 .code-area {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: 13px;
   min-height: 120px;
 }
 
@@ -160,7 +160,7 @@ body {
   padding: 7px 14px;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
 }
 .btn:hover {
   border-color: var(--primary);
@@ -183,7 +183,7 @@ body {
 }
 
 .status {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .status.error {
@@ -210,7 +210,7 @@ body {
   border-radius: var(--radius);
 }
 .setup-banner .sb-icon {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--warn);
   font-family: ui-monospace, monospace;
@@ -223,15 +223,15 @@ body {
   min-width: 0;
 }
 .setup-banner .sb-text b {
-  font-size: 12px;
+  font-size: 13px;
   color: #7d4e00;
 }
 .setup-banner .sb-text span {
-  font-size: 11px;
+  font-size: 12px;
   color: #9a6700;
 }
 .btn.mini {
-  font-size: 11px;
+  font-size: 12px;
   padding: 5px 10px;
   white-space: nowrap;
 }
@@ -254,7 +254,7 @@ body {
   border-bottom: 1px solid var(--border-soft);
 }
 .chat-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--muted);
 }
@@ -292,7 +292,7 @@ body {
   background: var(--panel-2);
   border: 1px solid var(--primary);
   border-radius: var(--radius);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
 }
 .picked-chip .pc-icon {
@@ -312,7 +312,7 @@ body {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
   padding: 0 2px;
 }
@@ -325,7 +325,7 @@ body {
   color: #fff;
 }
 .conv-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .conv-actions {
@@ -348,7 +348,7 @@ body {
   color: var(--muted);
   text-align: center;
   padding: 16px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .history-item {
   background: var(--panel-2);
@@ -368,7 +368,7 @@ body {
 }
 .history-item .hi-status {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 13px;
 }
 .history-item.done .hi-status {
   color: var(--ok);
@@ -391,7 +391,7 @@ body {
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   padding: 0 4px;
   border-radius: 4px;
 }
@@ -401,7 +401,7 @@ body {
 .history-item .hi-meta {
   margin-top: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 /* 回放历史会话时的对话区提示条 */
 .conv-replay-tip {
@@ -411,7 +411,7 @@ body {
   border: 1px solid #d4a72c66;
   border-left: 3px solid var(--warn);
   border-radius: var(--radius);
-  font-size: 11px;
+  font-size: 12px;
   color: #7d4e00;
 }
 .conversation {
@@ -437,7 +437,7 @@ body {
   max-width: 88%;
   padding: 8px 11px;
   border-radius: var(--radius);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.55;
   word-break: break-word;
   white-space: pre-wrap;
@@ -481,16 +481,71 @@ body {
 .assistant.error .a-dot {
   color: var(--danger);
 }
-/* 助手气泡里的说明摘要 */
+/* 助手气泡里的说明摘要（支持 Markdown 渲染后的 HTML） */
 .assistant .a-summary {
   margin-top: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   white-space: pre-line;
 }
 .assistant .a-summary.error-text {
   color: var(--danger);
+}
+/* Markdown 内容样式（answer 模式） */
+.assistant .a-summary p {
+  margin: 0 0 6px;
+}
+.assistant .a-summary p:last-child {
+  margin-bottom: 0;
+}
+.assistant .a-summary ul {
+  margin: 4px 0;
+  padding-left: 16px;
+}
+.assistant .a-summary li {
+  margin: 2px 0;
+}
+.assistant .a-summary code {
+  background: var(--bg-code, #f0f0f0);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+.assistant .a-summary pre {
+  background: var(--bg-code, #f0f0f0);
+  border-radius: 4px;
+  padding: 8px;
+  overflow-x: auto;
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.assistant .a-summary pre code {
+  background: none;
+  padding: 0;
+}
+.assistant .a-summary strong {
+  font-weight: 600;
+}
+.assistant .a-summary table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 12px;
+  white-space: normal;
+  width: 100%;
+}
+.assistant .a-summary th,
+.assistant .a-summary td {
+  border: 1px solid var(--border, #ddd);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.assistant .a-summary th {
+  background: var(--bg-hover, #f5f5f5);
+  font-weight: 600;
 }
 /* 代码规模徽标 */
 .assistant .a-badges {
@@ -500,7 +555,7 @@ body {
   flex-wrap: wrap;
 }
 .assistant .a-badge {
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 8px;
   border-radius: 4px;
   background: var(--bg);
@@ -520,7 +575,7 @@ body {
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   padding: 2px 0;
 }
 .assistant .trace-toggle:hover {
@@ -542,7 +597,7 @@ body {
 .trace-item {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   padding: 5px 8px;
   border-radius: var(--radius);
@@ -578,7 +633,7 @@ body {
   background: var(--bg);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
@@ -599,7 +654,7 @@ body {
   background: var(--bg);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  font-size: 11px;
+  font-size: 12px;
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 120px;
@@ -645,7 +700,7 @@ body {
 }
 .ask-opt {
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 13px;
   border: 1px solid var(--primary);
   border-radius: var(--radius);
   background: var(--bg);
@@ -670,7 +725,7 @@ body {
   flex: 1;
   min-width: 0;
   padding: 5px 8px;
-  font-size: 12px;
+  font-size: 13px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -678,7 +733,7 @@ body {
 }
 .ask-send {
   padding: 5px 12px;
-  font-size: 12px;
+  font-size: 13px;
   border: none;
   border-radius: var(--radius);
   background: var(--primary);
@@ -691,7 +746,7 @@ body {
 }
 .ask-answered {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ok);
   font-weight: 500;
 }
@@ -715,12 +770,12 @@ body {
   border-radius: var(--radius);
   color: var(--text);
   padding: 7px 10px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 .explain {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   margin: 0 0 10px;
   line-height: 1.5;
   white-space: pre-line;
@@ -738,7 +793,7 @@ body {
   padding: 4px 10px;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
 }
 .tab.active {
   background: var(--panel-2);
@@ -753,7 +808,7 @@ body {
 }
 .match-row label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 .match-row select {
   flex: 1;
@@ -782,7 +837,7 @@ body {
   color: var(--muted);
   text-align: center;
   padding: 16px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .rule-item {
@@ -805,7 +860,7 @@ body {
 }
 .rule-item .rule-meta {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 4px;
 }
 .rule-item .rule-actions {
@@ -814,7 +869,7 @@ body {
   margin-top: 8px;
 }
 .rule-item .mini {
-  font-size: 11px;
+  font-size: 12px;
   padding: 4px 8px;
 }
 .mini.del {

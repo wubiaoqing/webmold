@@ -527,7 +527,20 @@ async function onGenerate() {
  * @param {object} result 后台返回的规则结果
  */
 async function handleTaskDone(turn, result) {
-  const { title, explanation, targetRuleId } = result || {};
+  const { title, explanation, targetRuleId, mode } = result || {};
+
+  // 纯回答模式：agent 判断用户只是提问，直接把答案渲染进助手气泡（Markdown），不进规则编辑区
+  if (mode === 'answer') {
+    const answerText = String(result?.answer || result?.explanation || '').trim();
+    finishTurn(turn, {
+      state: 'done',
+      title: '回答完成',
+      summaryHtml: renderMarkdown(answerText),
+    });
+    setStatus('已回答', 'ok');
+    return;
+  }
+
   let css = typeof result?.css === 'string' ? result.css : '';
   let js = typeof result?.js === 'string' ? result.js : '';
 
@@ -703,14 +716,23 @@ function replayHistorySession(s) {
 
   // 收尾气泡（根据终态）
   if (s.status === 'done' && s.result) {
-    const { title, css, js, explanation } = s.result;
-    finishTurn(turn, {
-      state: 'done',
-      title: title || '未命名规则',
-      summary: explanation || '已生成规则。',
-      css,
-      js,
-    });
+    const { title, css, js, explanation, mode } = s.result;
+    if (mode === 'answer') {
+      // 问答类历史：渲染答案气泡
+      finishTurn(turn, {
+        state: 'done',
+        title: '回答完成',
+        summaryHtml: renderMarkdown(s.result.answer || explanation || ''),
+      });
+    } else {
+      finishTurn(turn, {
+        state: 'done',
+        title: title || '未命名规则',
+        summary: explanation || '已生成规则。',
+        css,
+        js,
+      });
+    }
   } else if (s.status === 'aborted') {
     finishTurn(turn, { state: 'error', title: '已停止', summary: s.error || '已手动停止本次生成' });
   } else if (s.status === 'failed') {
@@ -800,7 +822,7 @@ function startTurn(prompt) {
 /**
  * 收尾一轮问答：更新助手气泡的状态点、标题与摘要，运行过程自动折叠。
  * @param {{assistant: HTMLElement}} turn startTurn 的返回值
- * @param {{state:'done'|'error', title:string, summary?:string, css?:string, js?:string}} data
+ * @param {{state:'done'|'error', title:string, summary?:string, summaryHtml?:string, css?:string, js?:string}} data
  */
 function finishTurn(turn, data) {
   if (!turn || !turn.assistant) return;
@@ -816,16 +838,21 @@ function finishTurn(turn, data) {
   const titleEl = a.querySelector('.a-title');
   if (titleEl) titleEl.textContent = data.title || (data.state === 'error' ? '生成失败' : '已完成');
 
-  // 摘要（说明）
+  // 摘要（说明）：优先用 summaryHtml（Markdown 渲染），否则用 summary（纯文本）
   const head = a.querySelector('.a-head');
-  if (data.summary) {
+  if (data.summaryHtml || data.summary) {
     const sum = document.createElement('div');
     sum.className = 'a-summary' + (data.state === 'error' ? ' error-text' : '');
-    sum.textContent = data.summary;
+    if (data.summaryHtml) {
+      // summaryHtml 是已渲染的 Markdown HTML，直接 innerHTML（内容来自 LLM，但已通过 renderMarkdown 处理过）
+      sum.innerHTML = data.summaryHtml;
+    } else {
+      sum.textContent = data.summary;
+    }
     head.after(sum);
   }
 
-  // 代码规模徽标
+  // 代码规模徽标（answer 模式不显示）
   const cssLen = (data.css || '').length;
   const jsLen = (data.js || '').length;
   if (cssLen || jsLen) {
@@ -859,6 +886,76 @@ function finishTurn(turn, data) {
   // 本轮结束，后续若没有新轮则不再有当前 trace
   _currentTrace = null;
   scrollConversationToBottom();
+}
+
+/**
+ * 将简单 Markdown 渲染为安全的 HTML（仅支持常用语法，防止 XSS）。
+ * 支持：粗体 **...**、行内代码 `...`、代码块 ```...```、无序列表 -/*、有序列表 1.、表格 |...|、段落。
+ * @param {string} text
+ * @returns {string} 安全 HTML
+ */
+function renderMarkdown(text) {
+  if (!text) return '';
+  let s = String(text);
+  // 1. 先用占位符保护代码块（内部可能有空行/特殊字符，不能被后续处理破坏）
+  const codeBlocks = [];
+  s = s.replace(/```(?:[\w-]*)\n([\s\S]*?)```/g, (_, code) => {
+    codeBlocks.push(code);
+    return `\u0000CODE${codeBlocks.length - 1}\u0000`;
+  });
+  const esc = (str) =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // 2. 转义 HTML
+  s = esc(s);
+  // 3. 行内代码：`...`
+  s = s.replace(/`([^`]+)`/g, (_, code) => `<code>${esc(code)}</code>`);
+  // 4. 粗体：**...**
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // 5. 提取表格块（表头 + 分隔行 + 数据行），用占位符保护，避免被段落处理拆散
+  const tables = [];
+  s = s.replace(/^\|.*\|\n\|[\s:\-|]+\|\n(?:\|.*\|\n?)+/gm, (match) => {
+    tables.push(match);
+    return `\u0000TABLE${tables.length - 1}\u0000`;
+  });
+  // 6. 无序列表：- 或 * 开头行
+  s = s.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>');
+  // 7. 有序列表：数字. 开头行
+  s = s.replace(/^\s*\d+\.\s+(.+)$/gm, '<li>$1</li>');
+  // 8. 把连续的 <li> 包成 <ul>
+  s = s.replace(/(<li>.*?<\/li>\n?)+/gs, (match) => '<ul>' + match + '</ul>');
+  // 9. 段落：两个换行分隔
+  s = s
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => '<p>' + p + '</p>')
+    .join('');
+  // 10. 还原代码块
+  s = s.replace(/\u0000CODE(\d+)\u0000/g, (_, i) => {
+    const code = codeBlocks[Number(i)];
+    return code === undefined ? '' : `<pre><code>${esc(code)}</code></pre>`;
+  });
+  // 11. 还原表格
+  s = s.replace(/\u0000TABLE(\d+)\u0000/g, (_, i) => {
+    const block = tables[Number(i)];
+    if (block === undefined) return '';
+    const splitRow = (row) =>
+      row
+        .trim()
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((c) => c.trim());
+    const lines = block.trim().split('\n');
+    const header = splitRow(lines[0]).map((c) => `<th>${c}</th>`).join('');
+    const body = lines
+      .slice(2)
+      .filter((r) => r.trim())
+      .map((r) => `<tr>${splitRow(r).map((c) => `<td>${c}</td>`).join('')}</tr>`)
+      .join('');
+    return `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+  });
+  return s;
 }
 
 // ---------- Agent 过程渲染 ----------
@@ -1009,8 +1106,8 @@ function renderAgentEvent(ev) {
    );
       break;
     case 'finish':
-      finalizeThinking('（未返回思考过程）整理并输出最终规则');
-      addTrace('finish', '★', `完成：${esc(ev.data?.title || '')}`);
+      finalizeThinking('（未返回思考过程）整理并输出最终结果');
+      addTrace('finish', '★', `完成：${esc(ev.data?.title || (ev.data?.mode === 'answer' ? '回答' : '规则'))}`);
    break;
     case 'error':
       addTrace('error', '✕', `出错：${esc(ev.data?.error)}`);
