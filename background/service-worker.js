@@ -11,6 +11,7 @@ import { MSG, AGENT_TOOL, AGENT_LIFECYCLE, AGENT_ASK, BRIDGE, domainFromUrl, uid
 import { getLlmConfig, getRulesByDomain, addHistorySession } from '../lib/storage.js';
 import { runCustomizeAgent } from '../lib/agent/agent-service.js';
 import { makeChatFn } from '../lib/agent/openai-chat.js';
+import { assessRuleRisk, stripExternalCss } from '../lib/safety.js';
 
 // ---------- 侧边栏 ----------
 chrome.action.onClicked.addListener((tab) => {
@@ -193,6 +194,117 @@ function previewUserJs(code) {
     new Function(code)();
   } catch (e) {
     console.error('[WebMold] 预览脚本执行出错:', e);
+  }
+}
+
+/**
+ * 预览沙箱（主世界）：预览期间强制约束规则 JS——
+ *  拦截网络外发（fetch/XHR/WebSocket/sendBeacon）、Cookie 读写脱敏、localStorage/sessionStorage 写拦截、
+ *  读返回空（防"读到敏感数据再外发"）。所有拦截记入 window.__webmold_sandbox__.logs，供面板展示。
+ * 预览结束调用 restorePreviewSandbox 恢复。
+ */
+function installPreviewSandbox() {
+  try {
+    if (window.__webmold_sandbox__) return;
+    const s = (window.__webmold_sandbox__ = { logs: [] });
+    const warn = (kind, detail) => {
+      try {
+        s.logs.push({ kind, detail: String(detail == null ? '' : detail).slice(0, 160), at: Date.now() });
+        console.warn('[WebMold 沙箱]', kind, detail);
+      } catch {
+        /* 忽略 */
+      }
+    };
+    const orig = {
+      fetch: window.fetch,
+      XMLHttpRequest: window.XMLHttpRequest,
+      WebSocket: window.WebSocket,
+      sendBeacon: window.navigator && window.navigator.sendBeacon,
+      cookieDesc: Object.getOwnPropertyDescriptor(Document.prototype, 'cookie'),
+      localStorageDesc: Object.getOwnPropertyDescriptor(window, 'localStorage'),
+      sessionStorageDesc: Object.getOwnPropertyDescriptor(window, 'sessionStorage'),
+    };
+    s.orig = orig;
+
+    window.fetch = function (...args) {
+      warn('network', 'fetch ' + (args && args[0]));
+      return Promise.reject(new Error('[WebMold 沙箱] 预览模式禁止网络请求'));
+    };
+    window.XMLHttpRequest = function () {
+      warn('network', 'XMLHttpRequest');
+      throw new Error('[WebMold 沙箱] 预览模式禁止 XMLHttpRequest');
+    };
+    window.WebSocket = function () {
+      warn('network', 'WebSocket');
+      throw new Error('[WebMold 沙箱] 预览模式禁止 WebSocket');
+    };
+    if (orig.sendBeacon) {
+      window.navigator.sendBeacon = function () {
+        warn('network', 'sendBeacon');
+        return false;
+      };
+    }
+    try {
+      Object.defineProperty(Document.prototype, 'cookie', {
+        get() {
+          warn('cookie-read', 'Cookie 读取已脱敏');
+          return '';
+        },
+        set(v) {
+          warn('cookie-write', v);
+        },
+        configurable: true,
+      });
+    } catch {
+      /* 忽略 */
+    }
+    ['localStorage', 'sessionStorage'].forEach((k) => {
+      try {
+        const real = window[k];
+        if (!real) return;
+        const safe = new Proxy(real, {
+          get(t, prop) {
+            if (prop === 'setItem' || prop === 'removeItem' || prop === 'clear') {
+              return (...args) => {
+                warn(k + '-write', args[0]);
+              };
+            }
+            if (prop === 'getItem' || prop === 'key') {
+              return () => {
+                warn(k + '-read', '读取已脱敏');
+                return null;
+              };
+            }
+            const v = t[prop];
+            return typeof v === 'function' ? v.bind(t) : v;
+          },
+        });
+        Object.defineProperty(window, k, { get: () => safe, configurable: true });
+      } catch {
+        /* 忽略 */
+      }
+    });
+  } catch (e) {
+    console.warn('[WebMold] 沙箱安装失败:', e);
+  }
+}
+
+/** 预览沙箱恢复（主世界）：还原被覆盖的全局函数与属性 */
+function restorePreviewSandbox() {
+  try {
+    const s = window.__webmold_sandbox__;
+    if (!s || !s.orig) return;
+    const o = s.orig;
+    window.fetch = o.fetch;
+    window.XMLHttpRequest = o.XMLHttpRequest;
+    window.WebSocket = o.WebSocket;
+    if (o.sendBeacon && window.navigator) window.navigator.sendBeacon = o.sendBeacon;
+    if (o.cookieDesc) Object.defineProperty(Document.prototype, 'cookie', o.cookieDesc);
+    if (o.localStorageDesc) Object.defineProperty(window, 'localStorage', o.localStorageDesc);
+    if (o.sessionStorageDesc) Object.defineProperty(window, 'sessionStorage', o.sessionStorageDesc);
+    delete window.__webmold_sandbox__;
+  } catch (e) {
+    console.warn('[WebMold] 沙箱恢复失败:', e);
   }
 }
 
@@ -542,6 +654,17 @@ async function runGenerateTask({ tabId, prompt, pageContext, existingRule, optio
       options: options || {},
     });
 
+    // 成功：先做规则安全评估（静态扫描 + 命中风险时派独立评审 LLM 复核），随结果一并下发，
+    // 供侧边栏展示风险徽章并在预览/保存前提醒用户。
+    if (result && (result.css || result.js)) {
+      try {
+        const cfg2 = await getLlmConfig();
+        const chatFn = makeChatFn(cfg2);
+        result.risk = await assessRuleRisk(result, { chatFn });
+      } catch (e) {
+        result.risk = { level: 'safe', findings: [], reviewed: false, error: String(e?.message || e) };
+      }
+    }
     // 成功：写入会话历史、更新任务终态、推送 done 事件（供 sidepanel 拿到结果并收尾气泡）
     pushHistory(tabId, prompt, result);
     task.status = 'done';
@@ -759,17 +882,38 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             case MSG.PREVIEW_RULE: {
               const { tabId, rule } = msg;
               if (tabId != null) {
-                if (rule.css !== undefined) {
-                  await chrome.tabs.sendMessage(tabId, { type: MSG.PREVIEW_RULE, rule }).catch(() => {});
-                }
+                // 预览一律进入沙箱：CSS 剥离外部资源引用；JS 先安装约束器再执行，拦截外发/敏感写
                 if (rule.js) {
                   await ensureBridge(tabId);
+                  await chrome.scripting
+                    .executeScript({ target: { tabId }, world: 'MAIN', func: installPreviewSandbox })
+                    .catch(() => {});
+                }
+                if (rule.css !== undefined) {
+                  const { css: safeCss } = stripExternalCss(rule.css);
+                  await chrome.tabs
+                    .sendMessage(tabId, { type: MSG.PREVIEW_RULE, rule: { ...rule, css: safeCss } })
+                    .catch(() => {});
+                }
+                if (rule.js) {
                   await chrome.scripting
                     .executeScript({ target: { tabId }, world: 'MAIN', func: previewUserJs, args: [rule.js] })
                     .catch(() => {});
                 }
               }
-              sendResponse({ ok: true });
+              // 回传沙箱拦截日志（可能因异步执行而不完整，仅作提示）
+              let sandboxLog = [];
+              try {
+                const res = await chrome.scripting.executeScript({
+                  target: { tabId },
+                  world: 'MAIN',
+                  func: () => (window.__webmold_sandbox__ && window.__webmold_sandbox__.logs || []).slice(-20),
+                });
+                sandboxLog = (res && res[0] && res[0].result) || [];
+              } catch {
+                /* 忽略 */
+              }
+              sendResponse({ ok: true, sandboxLog });
               break;
             }
 
@@ -784,6 +928,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               const { tabId } = msg;
               if (tabId != null) {
                 await chrome.tabs.sendMessage(tabId, { type: MSG.CLEAR_PREVIEW }).catch(() => {});
+                // 恢复预览沙箱覆盖的全局函数/属性
+                await chrome.scripting
+                  .executeScript({ target: { tabId }, world: 'MAIN', func: restorePreviewSandbox })
+                  .catch(() => {});
               }
               sendResponse({ ok: true });
               break;

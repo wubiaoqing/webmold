@@ -913,3 +913,158 @@ body {
 .switch input:checked + .slider::before {
   transform: translateX(16px);
 }
+
+/* ---------- 规则安全风险 ---------- */
+.risk-box {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border, #d0d7de);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.risk-box:has(.risk-badge.med),
+.risk-box:has(.risk-badge.high) {
+  background: #fff8f0;
+  border-color: #f0b37e99;
+}
+.risk-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.risk-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+.risk-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.risk-badge.ok {
+  background: color-mix(in srgb, var(--ok) 14%, #fff);
+  color: var(--ok);
+}
+.risk-badge.low {
+  background: color-mix(in srgb, var(--warn) 14%, #fff);
+  color: var(--warn);
+}
+.risk-badge.med {
+  background: color-mix(in srgb, #d4a72c 22%, #fff);
+  color: #7d4e00;
+}
+.risk-badge.high {
+  background: color-mix(in srgb, var(--danger) 14%, #fff);
+  color: var(--danger);
+}
+.risk-findings {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.risk-item {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px dashed var(--border, #d0d7de);
+  align-items: flex-start;
+}
+.risk-item:first-child {
+  border-top: none;
+}
+.risk-sev {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 8px;
+  line-height: 16px;
+  background: var(--panel-2);
+  color: var(--muted);
+  border: 1px solid var(--border, #d0d7de);
+}
+.risk-item.high .risk-sev {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.risk-item.medium .risk-sev {
+  color: #9a6700;
+  border-color: #d4a72c;
+}
+.risk-item.low .risk-sev {
+  color: var(--warn);
+}
+.risk-info {
+  flex: 1;
+  min-width: 0;
+}
+.risk-reason {
+  font-size: 12px;
+}
+.risk-evidence {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--muted);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.risk-summary {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px dashed var(--border, #d0d7de);
+  padding-top: 6px;
+}
+.risk-reviewed {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ok);
+}
+
+/* 风险确认弹窗 */
+.risk-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.risk-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel, #fff);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  padding: 14px 16px;
+}
+.risk-modal h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.risk-modal-body {
+  overflow-y: auto;
+  font-size: 13px;
+}
+.risk-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}

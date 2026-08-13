@@ -1,6 +1,7 @@
 // 侧边栏逻辑：需求输入 -> 调 background 生成 -> 预览 -> 保存 -> 管理规则
 
 import { MSG, AGENT_LIFECYCLE, AGENT_ASK, uid, domainFromUrl } from '../lib/types.js';
+import { scanRuleStatic, RISK_LEVELS } from '../lib/safety.js';
 import {
   getRulesByDomain,
   getLlmConfig,
@@ -40,6 +41,12 @@ const els = {
   resultPanel: $('resultPanel'),
   resultTitle: $('resultTitle'),
   resultExplain: $('resultExplain'),
+  riskBox: $('riskBox'),
+  riskModal: $('riskModal'),
+  riskModalTitle: $('riskModalTitle'),
+  riskModalBody: $('riskModalBody'),
+  riskModalOk: $('riskModalOk'),
+  riskModalCancel: $('riskModalCancel'),
   cssCode: $('cssCode'),
   jsCode: $('jsCode'),
   matchType: $('matchType'),
@@ -55,8 +62,10 @@ saveBtn: $('saveBtn'),
 let currentTab = null; // { id, url }
 let currentDomain = '';
 let editingRuleId = null; // 若在编辑已有规则
-// 用户在页面上选中的元素（作为对话上下文），null 表示未选。结构见 content-script describePicked()
-let selectedElement = null;
+// 用户在页面上选中的元素列表（作为对话上下文），空数组表示未选。结构见 content-script describePicked()
+let selectedElements = [];
+// 当前编辑区代码对应的风险评估结果（{level,findings,reviewed}）；代码改动后需重新静态扫描
+let _currentRisk = null;
 // 是否正处于「选择元素」拾取模式
 let pickingElement = false;
 // 是否处于「历史会话回放」只读视图；此时暂停实时事件渲染，避免串入历史内容。
@@ -164,7 +173,7 @@ async function switchToTab(tab) {
     els.pickElementBtn.classList.remove('picking');
     els.pickElementBtn.textContent = '选择元素';
   }
-  selectedElement = null;
+  selectedElements = [];
   renderPickedChip();
   viewingHistory = false;
   els.backToLiveBtn.classList.add('hidden');
@@ -380,18 +389,23 @@ function bindEvents() {
       if (viewingHistory) return;
       renderAgentEvent(msg.event);
     }
-    // 用户在页面上完成了元素选择（或按 Esc 取消）
+    // 用户在页面上完成了元素选择（提交多选结果或按 Esc 取消）
     if (msg && msg.type === MSG.ELEMENT_PICKED) {
       pickingElement = false;
       els.pickElementBtn.classList.remove('picking');
       els.pickElementBtn.textContent = '选择元素';
-      if (msg.cancelled || !msg.element) {
+      if (msg.cancelled) {
         setStatus('已取消选择元素', '');
         return;
       }
-      selectedElement = msg.element;
+      selectedElements = Array.isArray(msg.elements) ? msg.elements : [];
       renderPickedChip();
-      setStatus('已选中元素，将作为对话上下文', 'ok');
+      setStatus(
+        selectedElements.length
+          ? `已选中 ${selectedElements.length} 个元素，将作为对话上下文`
+          : '已取消选择元素',
+        selectedElements.length ? 'ok' : ''
+      );
     }
   });
 
@@ -579,7 +593,7 @@ async function handleTaskDone(turn, result) {
     if (!js && baseRule.js) js = baseRule.js;
   }
 
-  fillResult({ title, css, js, explanation });
+  fillResult({ title, css, js, explanation, risk: result.risk });
 
   finishTurn(turn, {
     state: 'done',
@@ -772,7 +786,7 @@ async function onNewSession() {
   _currentTrace = null;
   activeTurn = null;
   // 清空已选元素上下文
-  selectedElement = null;
+  selectedElements = [];
   renderPickedChip();
   // 退出可能存在的历史回放态
   viewingHistory = false;
@@ -1289,8 +1303,8 @@ async function getPageContext() {
     ctx = null;
   }
   ctx = ctx || { url: currentTab.url, title: '', domSnapshot: '' };
-  // 若用户显式选中了某个元素，作为聚焦上下文一并带上
-  if (selectedElement) ctx.selectedElement = selectedElement;
+  // 若用户显式选中了元素，作为聚焦上下文一并带上（支持多个）
+  if (selectedElements.length) ctx.selectedElements = selectedElements;
   return ctx;
 }
 
@@ -1347,40 +1361,155 @@ async function sendToContentWithInject(tabId, message) {
   }
 }
 
-/** 渲染已选元素 chip */
+/** 渲染已选元素 chip：单个显示选择器，多个显示数量（悬浮提示列出全部选择器） */
 function renderPickedChip() {
-  if (!selectedElement) {
+  if (!selectedElements.length) {
     els.pickedChip.classList.add('hidden');
     els.pickedText.textContent = '';
+    els.pickedText.title = '';
     return;
   }
-  const label = selectedElement.selector || selectedElement.tag || '已选元素';
+  const n = selectedElements.length;
+  const label =
+    n === 1
+      ? selectedElements[0].selector || selectedElements[0].tag || '已选元素'
+      : `已选 ${n} 个元素`;
   els.pickedText.textContent = label;
-  els.pickedText.title = label;
+  els.pickedText.title = selectedElements
+    .map((e) => e.selector || e.tag || '?')
+    .join('\n');
   els.pickedChip.classList.remove('hidden');
 }
 
 /** 清除已选元素 */
 function clearSelectedElement() {
-  selectedElement = null;
+  selectedElements = [];
   renderPickedChip();
   setStatus('已移除所选元素', '');
 }
 
-function fillResult({ title, css, js, explanation }) {
+function fillResult({ title, css, js, explanation, risk }) {
   els.resultTitle.value = title || '';
   els.cssCode.value = css || '';
   els.jsCode.value = js || '';
   els.resultExplain.textContent = explanation || '';
+  // 优先用后台评估结果（含独立评审）；无则本地静态扫描兜底
+  _currentRisk = risk || scanRuleStatic({ css, js });
+  renderRiskBox();
   els.resultPanel.classList.remove('hidden');
+}
+
+// ---------- 风险展示与确认 ----------
+const RISK_META = {
+  safe: { text: '安全', cls: 'ok' },
+  low: { text: '低风险', cls: 'low' },
+  medium: { text: '中风险', cls: 'med' },
+  high: { text: '高风险', cls: 'high' },
+};
+
+function riskBadgeHtml(level) {
+  const m = RISK_META[level] || RISK_META.low;
+  return `<span class="risk-badge ${m.cls}">${m.text}</span>`;
+}
+
+function sevText(sev) {
+  return ({ high: '高', medium: '中', low: '低' }[sev] || '?') + '危';
+}
+
+/** 渲染风险清单 HTML（用于面板与确认弹窗） */
+function riskFindingsHtml(risk) {
+  const items = ((risk && risk.findings) || []).length
+    ? (risk.findings)
+        .map(
+          (f) => `
+        <li class="risk-item ${f.severity}">
+          <span class="risk-sev">${sevText(f.severity)}</span>
+          <div class="risk-info">
+            <div class="risk-reason">${esc(f.reason)}</div>
+            ${f.evidence ? `<code class="risk-evidence">${esc(f.evidence)}</code>` : ''}
+          </div>
+        </li>`
+        )
+        .join('')
+    : '<li class="risk-item"><span class="risk-sev">无</span><div class="risk-info"><div class="risk-reason">未发现明显风险</div></div></li>';
+  const reviewed =
+    risk && risk.reviewed ? '<div class="risk-reviewed">已由独立安全审查员复核</div>' : '';
+  const summary =
+    risk && risk.summary ? `<div class="risk-summary">${esc(risk.summary)}</div>` : '';
+  return `<ul class="risk-findings">${items}</ul>${reviewed}${summary}`;
+}
+
+/** 刷新编辑区顶部的风险面板 */
+function renderRiskBox() {
+  if (!_currentRisk) {
+    els.riskBox.classList.add('hidden');
+    return;
+  }
+  const hint = {
+    high: '存在高风险操作，预览/保存前请确认风险明细',
+    medium: '含风险操作，预览/保存前请确认',
+    low: '存在轻微风险特征',
+    safe: '未发现明显风险，可放心预览保存',
+  }[_currentRisk.level] || '';
+  els.riskBox.innerHTML = `
+    <div class="risk-head">${riskBadgeHtml(_currentRisk.level)}<span class="risk-hint">${esc(hint)}</span></div>
+    ${riskFindingsHtml(_currentRisk)}`;
+  els.riskBox.classList.remove('hidden');
+}
+
+/**
+ * 弹风险确认框。返回 Promise<boolean>：true 表示用户坚持继续。
+ * @param {{level:string,findings:Array<Object>,summary?:string,reviewed?:boolean}} risk
+ * @param {{title:string,okText?:string}} opts
+ */
+function confirmRiskModal(risk, { title, okText }) {
+  return new Promise((resolve) => {
+    els.riskModalTitle.textContent = title;
+    els.riskModalBody.innerHTML = riskFindingsHtml(risk);
+    els.riskModalOk.textContent = okText || '仍然继续';
+    els.riskModal.classList.remove('hidden');
+    const done = (v) => {
+      els.riskModal.classList.add('hidden');
+      els.riskModalOk.removeEventListener('click', onOk);
+      els.riskModalCancel.removeEventListener('click', onCancel);
+      resolve(v);
+    };
+    const onOk = () => done(true);
+    const onCancel = () => done(false);
+    els.riskModalOk.addEventListener('click', onOk);
+    els.riskModalCancel.addEventListener('click', onCancel);
+  });
+}
+
+/** 供调用方判断某风险是否值得弹确认 */
+function riskNeedsConfirm(risk) {
+  return !!risk && (risk.level === RISK_LEVELS.MEDIUM || risk.level === RISK_LEVELS.HIGH);
 }
 
 // ---------- 预览 ----------
 async function onPreview() {
   if (!currentTab) return;
   const rule = collectResult();
-  await sendMsg({ type: MSG.PREVIEW_RULE, tabId: currentTab.id, rule });
-  setStatus('已应用预览（未保存）', 'ok');
+  // 用户可能改过代码：用当前内容重新静态扫描并刷新风险面板
+  _currentRisk = scanRuleStatic(rule);
+  renderRiskBox();
+  if (riskNeedsConfirm(_currentRisk)) {
+    const ok = await confirmRiskModal(_currentRisk, {
+      title: _currentRisk.level === RISK_LEVELS.HIGH ? '规则存在高风险操作' : '规则存在风险操作',
+      okText: '沙箱预览',
+    });
+    if (!ok) {
+      setStatus('已取消预览', '');
+      return;
+    }
+  }
+  // 预览一律走沙箱：外发请求/敏感写会被拦截
+  const res = await sendMsg({ type: MSG.PREVIEW_RULE, tabId: currentTab.id, rule });
+  const n = res && res.sandboxLog && res.sandboxLog.length;
+  setStatus(
+    n ? `已应用沙箱预览（已拦截 ${n} 次敏感操作），未保存` : '已应用沙箱预览（未保存）',
+    'ok'
+  );
 }
 
 async function onClearPreview() {
@@ -1397,6 +1526,23 @@ async function onSave() {
     setStatus('CSS 和 JS 均为空，无需保存', 'error');
     return;
   }
+
+  // 风险检查：用户可能改过代码，重新静态扫描；中/高风险需逐条确认后才允许保存
+  const risk = scanRuleStatic(partial);
+  if (riskNeedsConfirm(risk)) {
+    const ok = await confirmRiskModal(risk, {
+      title:
+        risk.level === RISK_LEVELS.HIGH
+          ? '规则存在高风险操作，保存后将在页面生效'
+          : '规则存在风险操作，保存后将在页面生效',
+      okText: '仍然保存',
+    });
+    if (!ok) {
+      setStatus('已取消保存', '');
+      return;
+    }
+  }
+  partial.risk = risk; // 随规则入库，供规则列表展示风险徽章
 
   const now = Date.now();
   let rule;
@@ -1504,14 +1650,26 @@ const title = document.createElement('div');
    : '精确URL';
   const kinds = [rule.css && 'CSS', rule.js && 'JS'].filter(Boolean).join('+');
   meta.textContent = `${scope} · ${kinds || '空'}`;
+  // 常驻风险徽章：一眼看出哪些规则存在风险
+  if (rule.risk) {
+    meta.insertAdjacentHTML('beforeend', ' ' + riskBadgeHtml(rule.risk.level));
+  }
 
   const actions = document.createElement('div');
   actions.className = 'rule-actions';
 
   const editBtn = mkBtn('编辑', 'mini', () => loadRuleToEditor(rule));
-  const previewBtn = mkBtn('预览', 'mini', () =>
- sendMsg({ type: MSG.PREVIEW_RULE, tabId: currentTab.id, rule })
-  );
+  const previewBtn = mkBtn('预览', 'mini', async () => {
+    // 已保存规则再次预览也走沙箱；命中风险先确认
+    if (riskNeedsConfirm(rule.risk)) {
+      const ok = await confirmRiskModal(rule.risk, {
+        title: '规则含风险，仍要预览吗？',
+        okText: '沙箱预览',
+      });
+      if (!ok) return;
+    }
+    await sendMsg({ type: MSG.PREVIEW_RULE, tabId: currentTab.id, rule });
+  });
   const delBtn = mkBtn('删除', 'mini del', async () => {
     if (!confirm(`删除规则「${rule.title}」？`)) return;
     await deleteRule(currentDomain, rule.id);

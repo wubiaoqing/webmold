@@ -133,8 +133,10 @@ const INTRODUCED_KEY = 'webmold_introduced';
 const INTRO_HOST_ID = 'webmold-intro-host';
 const INTRO_WAIT_MS = 8000; // 等待 JS 新增元素出现的最长时间
 const INTRO_AUTO_DISMISS_MS = 12000; // 引导自动消失时间
+const PREVIEW_INTRO_WAIT_MS = 2500; // 预览引导等待 JS 元素出现的时间（预览 JS 立即执行，短等即可）
 
 let _introBusy = false; // 同一时刻只引导一条，避免多条规则争抢/叠加
+let _previewIntroCanceled = false; // 清除预览时取消尚在等待中的预览引导
 
 /** 读取已引导规则集合 */
 function getIntroducedSet() {
@@ -184,9 +186,10 @@ function snapshotExistingWebmoldEls() {
  * 等待「本次规则新增的、可见的」data-webmold 元素出现。
  * 排除引导自身宿主与拾取覆盖层；优先取视口内、面积最大的一个作为引导目标。
  * @param {WeakSet} preexisting 引导前已存在的元素集合
+ * @param {number} [timeoutMs] 等待上限，默认 INTRO_WAIT_MS
  * @returns {Promise<Element|null>}
  */
-function waitForNewWebmoldEl(preexisting) {
+function waitForNewWebmoldEl(preexisting, timeoutMs) {
   const pick = () => {
     let best = null;
     let bestScore = -1;
@@ -248,7 +251,7 @@ if (score > bestScore) {
     } catch {
       return resolve(null);
     }
-    const timer = setTimeout(() => finish(null), INTRO_WAIT_MS);
+    const timer = setTimeout(() => finish(null), timeoutMs || INTRO_WAIT_MS);
   });
 }
 
@@ -281,13 +284,34 @@ async function maybeIntroduceRules(introRules) {
 }
 
 /**
+ * 预览时的即时引导：用户点「预览」后立即高亮本次规则新增的 UI。
+ * 与首次出现引导不同：不检查/写入「已引导」标记（预览不消耗正式引导），
+ * 只要预览的 JS 可能新增元素就尝试引导，让用户立刻看到效果在哪。
+ * @param {{id?:string,title?:string,js?:string,css?:string}} [rule]
+ */
+async function maybePreviewIntroduce(rule) {
+  if (_introBusy) return; // 正在展示其它引导，跳过本次预览引导
+  if (!rule || !rule.js) return; // 纯 CSS 规则通常无可指的新 UI，不打扰
+  _introBusy = true;
+  _previewIntroCanceled = false;
+  try {
+    const preexisting = snapshotExistingWebmoldEls();
+    const target = await waitForNewWebmoldEl(preexisting, PREVIEW_INTRO_WAIT_MS);
+    if (target && !_previewIntroCanceled) showIntroFor(target, rule.title, true);
+  } finally {
+    _introBusy = false;
+  }
+}
+
+/**
  * 针对目标元素展示引导：一个覆盖在目标上方的脉冲高亮光圈 + 一张指向气泡卡片（含「知道了」）。
  * 全部放进 Shadow DOM，避免样式互相污染，也不被规则/页面 CSS 命中。
  * 目标滚动出视口/点击「知道了」/超时后自动收起。
  * @param {Element} target
  * @param {string} [title] 规则标题，用于气泡文案
+ * @param {boolean} [preview] 是否为预览引导（文案不同，且不持久化）
  */
-function showIntroFor(target, title) {
+function showIntroFor(target, title, preview) {
   // 先移除可能残留的旧引导
   const old = document.getElementById(INTRO_HOST_ID);
   if (old) old.remove();
@@ -363,9 +387,13 @@ background: #1f2937;
   const d = document.createElement('div');
   d.className = 'd';
   // 文案含规则标题（来自模型/用户，用 textContent 防 XSS）
-  d.textContent = title
-    ? `「${title}」已生效，就在高亮位置，点这里试试吧。`
-    : '这是插件按你的需求新增的功能，就在高亮位置，去试试吧。';
+  d.textContent = preview
+    ? (title
+        ? `「${title}」预览已应用，高亮位置就是新增的功能，满意后再点保存。`
+        : '预览已应用，高亮位置就是新增的功能，满意后再点保存。')
+    : (title
+        ? `「${title}」已生效，就在高亮位置，点这里试试吧。`
+        : '这是插件按你的需求新增的功能，就在高亮位置，去试试吧。');
   const ok = document.createElement('button');
   ok.className = 'ok';
   ok.type = 'button';
@@ -440,15 +468,19 @@ host.remove();
 
 // ---------- 元素拾取模式 ----------
 // 用户在侧边栏点「选择元素」后，页面进入拾取模式：
-//  - 鼠标悬停时高亮候选元素；
-//  - 单击选中该元素，生成稳定的 CSS 选择器 + 结构摘要，回传给侧边栏作为对话上下文；
-//  - Esc 或右键取消。
-// 拾取全程只做「观察」，不修改页面业务DOM（高亮用一个覆盖层实现，随用随清）。
+//  - 鼠标悬停时蓝色高亮候选元素；
+//  - 单击切换选中/取消该元素（可连续多选，已选元素以绿色标记框标出），
+//    生成稳定的 CSS 选择器 + 结构摘要；
+//  - Esc 或再次点击侧边栏按钮完成选择，一次性把全部已选元素回传给侧边栏作为对话上下文。
+// 拾取全程只做「观察」，不修改页面业务DOM（高亮/标记用覆盖层实现，随用随清）。
 
 const PICK_OVERLAY_ID = 'webmold-pick-overlay';
 const PICK_TIP_ID = 'webmold-pick-tip';
+const PICK_SELECTED_ID = 'webmold-pick-selected';
 let picking = false;
 let pickHoverEl = null;
+let pickedEls = []; // 已选中的元素引用（用于绿色标记框定位）
+let pickedInfos = []; // 与 pickedEls 一一对应的元素摘要（describePicked 结果）
 
 /** 转义 CSS 标识符中的特殊字符，供拼接选择器时使用 */
 function cssEscapeIdent(str) {
@@ -572,7 +604,6 @@ function ensurePickTip() {
     tip = document.createElement('div');
     tip.id = PICK_TIP_ID;
     tip.setAttribute('data-webmold', '1');
-    tip.textContent = 'WebMold：点击选择一个元素作为上下文，按 Esc 取消';
     Object.assign(tip.style, {
       position: 'fixed',
       zIndex: '2147483647',
@@ -593,6 +624,116 @@ function ensurePickTip() {
   return tip;
 }
 
+/** 按当前已选数量刷新提示条文案 */
+function updatePickTip() {
+  const tip = document.getElementById(PICK_TIP_ID);
+  if (!tip) return;
+  const n = pickedEls.length;
+  tip.textContent = n
+    ? `WebMold：已选 ${n} 个元素，点击可继续添加/取消，按 Esc 完成`
+    : 'WebMold：点击元素选中（可多选），再点一下取消，按 Esc 完成';
+}
+
+/** 创建/获取「已选元素」标记容器（内含多个绿色标记框，pointer-events:none） */
+function ensurePickSelected() {
+  let box = document.getElementById(PICK_SELECTED_ID);
+  if (!box) {
+    box = document.createElement('div');
+    box.id = PICK_SELECTED_ID;
+    box.setAttribute('data-webmold', '1');
+    Object.assign(box.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '0',
+      height: '0',
+      zIndex: '2147483645',
+      pointerEvents: 'none',
+    });
+    document.documentElement.appendChild(box);
+  }
+  return box;
+}
+
+/** 把每个已选元素的绿色标记框对齐到元素当前位置（页面滚动/尺寸变化后调用） */
+function refreshSelectedMarkers() {
+  const box = ensurePickSelected();
+  const used = [];
+  for (let i = 0; i < pickedEls.length; i++) {
+    const el = pickedEls[i];
+    let r;
+    try {
+      r = el.getBoundingClientRect();
+    } catch {
+      continue;
+    }
+    if (!r || r.width <= 0 || r.height <= 0) continue; // 隐藏/移除的元素跳过
+    let mk = box.children[i];
+    if (!mk) {
+      mk = document.createElement('div');
+      Object.assign(mk.style, {
+        position: 'fixed',
+        boxSizing: 'border-box',
+        border: '2px solid #22c55e',
+        background: 'rgba(34,197,94,0.12)',
+        borderRadius: '3px',
+        transition: 'all 0.05s ease-out',
+      });
+      box.appendChild(mk);
+    }
+    Object.assign(mk.style, {
+      display: 'block',
+      top: `${r.top}px`,
+      left: `${r.left}px`,
+      width: `${r.width}px`,
+      height: `${r.height}px`,
+    });
+    used.push(mk);
+  }
+  // 移除多余的标记框（取消选中的）
+  while (box.children.length > used.length) box.lastChild.remove();
+}
+
+let _markerRaf = 0;
+/** 节流调度：滚动/悬停高频事件下用 rAF 合并标记框刷新 */
+function scheduleRefreshMarkers() {
+  if (_markerRaf) return;
+  _markerRaf = requestAnimationFrame(() => {
+    _markerRaf = 0;
+    refreshSelectedMarkers();
+  });
+}
+
+/** 点击元素：切换选中/取消选中，并立即采集摘要 */
+function togglePickElement(el) {
+  const idx = pickedEls.indexOf(el);
+  if (idx >= 0) {
+    pickedEls.splice(idx, 1);
+    pickedInfos.splice(idx, 1);
+  } else {
+    pickedEls.push(el);
+    pickedInfos.push(describePicked(el));
+  }
+  refreshSelectedMarkers();
+  updatePickTip();
+}
+
+/** 完成/取消拾取：把全部已选元素回传给侧边栏，并清理拾取态 */
+function finishPick(cancelled) {
+  const elements = cancelled ? [] : pickedInfos.slice();
+  stopPickElement();
+  try {
+    chrome.runtime.sendMessage({
+      type: MSG.ELEMENT_PICKED,
+      elements,
+      cancelled: !!cancelled,
+      pageUrl: location.href,
+    });
+  } catch {
+    /* 侧边栏可能已关闭，忽略 */
+  }
+}
+
 function positionOverlayTo(el) {
   const ov = ensurePickOverlay();
   const r = el.getBoundingClientRect();
@@ -606,11 +747,23 @@ function positionOverlayTo(el) {
 const onPickMouseMove = (e) => {
   if (!picking) return;
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  if (!el || el === pickHoverEl) return;
-  // 跳过我们自己的覆盖层/提示条
-  if (el.id === PICK_OVERLAY_ID || el.id === PICK_TIP_ID) return;
-  pickHoverEl = el;
-  positionOverlayTo(el);
+  // 已选元素的标记框区域也允许穿透定位到底下元素，故只跳过悬停层/提示条
+  if (!el || el.id === PICK_OVERLAY_ID || el.id === PICK_TIP_ID) return;
+  if (el !== pickHoverEl) {
+    pickHoverEl = el;
+    positionOverlayTo(el);
+  }
+  scheduleRefreshMarkers(); // 滚动/移动时同步标记框位置
+};
+
+const onPickScroll = () => {
+  if (!picking) return;
+  scheduleRefreshMarkers();
+};
+
+const onPickResize = () => {
+  if (!picking) return;
+  scheduleRefreshMarkers();
 };
 
 const onPickClick = (e) => {
@@ -618,26 +771,16 @@ const onPickClick = (e) => {
   e.preventDefault();
   e.stopPropagation();
   const el = pickHoverEl || document.elementFromPoint(e.clientX, e.clientY);
-  if (!el || el.id === PICK_OVERLAY_ID || el.id === PICK_TIP_ID) return;
-  const info = describePicked(el);
-  stopPickElement();
-  // 回传给侧边栏
-  try {
-    chrome.runtime.sendMessage({ type: MSG.ELEMENT_PICKED, element: info, pageUrl: location.href });
-  } catch {
-    /* 侧边栏可能已关闭，忽略 */
-  }
+  if (!el || el.id === PICK_OVERLAY_ID || el.id === PICK_TIP_ID || el.id === PICK_SELECTED_ID) return;
+  togglePickElement(el); // 多选：切换选中态，不退出拾取模式
 };
 
 const onPickKeydown = (e) => {
-  if (picking && e.key === 'Escape') {
+  if (!picking) return;
+  if (e.key === 'Escape') {
     e.preventDefault();
-    stopPickElement();
-    try {
-      chrome.runtime.sendMessage({ type: MSG.ELEMENT_PICKED, element: null, cancelled: true });
-    } catch {
-      /* 忽略 */
-    }
+    // 有已选元素则提交，无则视为取消
+    finishPick(pickedEls.length === 0);
   }
 };
 
@@ -645,24 +788,36 @@ function startPickElement() {
   if (picking) return;
   picking = true;
   pickHoverEl = null;
+  pickedEls = [];
+  pickedInfos = [];
   ensurePickOverlay();
   ensurePickTip();
+  ensurePickSelected();
+  updatePickTip();
   // 捕获阶段监听，尽量抢在页面自身处理之前
   document.addEventListener('mousemove', onPickMouseMove, true);
   document.addEventListener('click', onPickClick, true);
   document.addEventListener('keydown', onPickKeydown, true);
+  document.addEventListener('scroll', onPickScroll, true);
+  window.addEventListener('resize', onPickResize);
 }
 
 function stopPickElement() {
   picking = false;
   pickHoverEl = null;
+  pickedEls = [];
+  pickedInfos = [];
   document.removeEventListener('mousemove', onPickMouseMove, true);
   document.removeEventListener('click', onPickClick, true);
   document.removeEventListener('keydown', onPickKeydown, true);
+  document.removeEventListener('scroll', onPickScroll, true);
+  window.removeEventListener('resize', onPickResize);
   const ov = document.getElementById(PICK_OVERLAY_ID);
   if (ov) ov.remove();
   const tip = document.getElementById(PICK_TIP_ID);
   if (tip) tip.remove();
+  const sel = document.getElementById(PICK_SELECTED_ID);
+  if (sel) sel.remove();
 }
 
 // ---------- Agent 只读工具执行端 ----------
@@ -795,7 +950,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       break;
 
     case MSG.STOP_PICK_ELEMENT:
-      stopPickElement();
+      // 再次点击侧边栏按钮视为完成：提交本次选中的全部元素（未选任何元素则视为取消）
+      finishPick(pickedEls.length === 0);
       sendResponse({ ok: true });
       break;
 
@@ -810,6 +966,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         (document.head || document.documentElement).appendChild(el);
       }
       el.textContent = css || '';
+      // 预览即时引导：等 JS 新增的 data-webmold 元素出现并高亮，让用户立刻看到效果位置
+      maybePreviewIntroduce(msg.rule || {});
       sendResponse({ ok: true });
       break;
     }
@@ -819,6 +977,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (el) el.remove();
       const agentCss = document.getElementById(AGENT_CSS_ID);
       if (agentCss) agentCss.remove();
+      // 取消尚在等待中的预览引导，并移除已展示的引导宿主
+      _previewIntroCanceled = true;
+      const intro = document.getElementById(INTRO_HOST_ID);
+      if (intro) intro.remove();
       sendResponse({ ok: true });
       break;
     }

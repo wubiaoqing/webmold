@@ -102,6 +102,9 @@
         </div>
         <p id="resultExplain" class="explain"></p>
 
+        <!-- 规则安全风险评估：徽章 + 风险明细（由 sidepanel.js 渲染） -->
+        <div id="riskBox" class="risk-box hidden"></div>
+
         <div class="code-tabs">
           <button class="tab active" data-tab="css">CSS</button>
           <button class="tab" data-tab="js">JS</button>
@@ -137,6 +140,18 @@
         </ul>
       </section>
     </main>
+
+    <!-- 风险确认弹窗：保存/预览高风险规则时展示风险明细 -->
+    <div id="riskModal" class="risk-modal-mask hidden">
+      <div class="risk-modal">
+        <h3 id="riskModalTitle"></h3>
+        <div id="riskModalBody" class="risk-modal-body"></div>
+        <div class="risk-modal-actions">
+          <button id="riskModalCancel" class="btn ghost">取消</button>
+          <button id="riskModalOk" class="btn primary">仍然继续</button>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="sidepanel.js"></script>
   </body>
