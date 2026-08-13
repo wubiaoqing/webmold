@@ -11,7 +11,8 @@
     "sidePanel",
     "tabs",
     "webNavigation",
-    "alarms"
+    "alarms",
+    "offscreen"
   ],
   "host_permissions": [
     "<all_urls>"

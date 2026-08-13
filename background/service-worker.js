@@ -11,6 +11,7 @@ import { MSG, AGENT_TOOL, AGENT_LIFECYCLE, AGENT_ASK, BRIDGE, domainFromUrl, uid
 import { getLlmConfig, getRulesByDomain, addHistorySession } from '../lib/storage.js';
 import { runCustomizeAgent } from '../lib/agent/agent-service.js';
 import { makeChatFn } from '../lib/agent/openai-chat.js';
+import { checkLocalAiAvailability } from '../lib/agent/local-chat.js';
 import { assessRuleRisk, stripExternalCss } from '../lib/safety.js';
 
 // ---------- 侧边栏 ----------
@@ -860,7 +861,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case MSG.APPLY_RULES:
     case MSG.PREVIEW_RULE:
     case MSG.ASK_LLM:
-    case MSG.CLEAR_PREVIEW: {
+    case MSG.CLEAR_PREVIEW:
+    case MSG.CHECK_LOCAL_AI:
+    case MSG.TEST_LOCAL_AI: {
       (async () => {
         try {
           switch (msg.type) {
@@ -934,6 +937,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                   .catch(() => {});
               }
               sendResponse({ ok: true });
+              break;
+            }
+
+            case MSG.CHECK_LOCAL_AI: {
+              // 检测 Chrome 内置本地 AI（Gemini Nano / Prompt API）可用性。
+              // chrome.offscreen 仅能在 service worker 中调用，故由 background 代为执行。
+              const { status, detail, info } = await checkLocalAiAvailability();
+              sendResponse({ ok: true, status, detail, info });
+              break;
+            }
+
+            case MSG.TEST_LOCAL_AI: {
+              // 在 service worker 中跑一次本地 AI 测试提示。
+              // chrome.offscreen 仅能在 SW 使用，故 options 页测试需转发到这里。
+              try {
+                const cfg = msg.cfg && msg.cfg.backend === 'local' ? msg.cfg : null;
+                if (!cfg) throw new Error('未提供本地模式配置');
+                const chatFn = makeChatFn(cfg);
+                const { content } = await chatFn(
+                  [{ role: 'user', content: '仅回复两个字：可用' }],
+                  null,
+                  {}
+                );
+                sendResponse({ ok: true, content: content || '' });
+              } catch (e) {
+                sendResponse({ ok: false, error: e?.message || String(e) });
+              }
               break;
             }
           }

@@ -2,6 +2,7 @@
 
 import { getLlmConfig, setLlmConfig, getAllRules, saveAllRules } from '../lib/storage.js';
 import { makeChatFn } from '../lib/agent/openai-chat.js';
+import { MSG } from '../lib/types.js';
 import {
   ensureModelsLoaded,
   getProviders,
@@ -88,7 +89,29 @@ async function init() {
   $('modelsSourceUrl').value = await getModelsSourceUrl();
   renderModelsMeta();
 
+  // 运行模式：默认云端；本地模式无需 API Key
+  const backend = llm.backend === 'local' ? 'local' : 'cloud';
+  const radio = document.querySelector(`input[name="backend"][value="${backend}"]`);
+  if (radio) radio.checked = true;
+  $('localTemperature').value = llm.temperature ?? 0.5;
+  updateBackendUI();
+
   bind();
+}
+
+// 根据运行模式切换显示云端 / 本地字段，并刷新提示文案
+function updateBackendUI() {
+  const local = getBackend() === 'local';
+  $('cloudFields').hidden = local;
+  $('localFields').hidden = !local;
+  $('backendHint').textContent = local
+    ? '无需任何 API Key，生成内容完全在本地完成，不会上传。'
+    : 'API Key / 代理 token 仅存储在本地浏览器中，不会上传。';
+}
+
+function getBackend() {
+  const checked = document.querySelector('input[name="backend"]:checked');
+  return checked && checked.value === 'local' ? 'local' : 'cloud';
 }
 
 function bind() {
@@ -103,18 +126,29 @@ function bind() {
   $('saveLlm').addEventListener('click', saveLlm);
   $('testLlm').addEventListener('click', testLlm);
   $('checkModelsUpdate').addEventListener('click', checkModelsUpdate);
+  // 切换运行模式 -> 刷新显示字段
+  document.querySelectorAll('input[name="backend"]').forEach((r) =>
+    r.addEventListener('change', updateBackendUI)
+  );
+  $('checkLocalAi').addEventListener('click', checkLocalAi);
   $('exportBtn').addEventListener('click', exportRules);
   $('importBtn').addEventListener('click', () => $('importFile').click());
   $('importFile').addEventListener('change', importRules);
 }
 
 function collectLlm() {
+  const local = getBackend() === 'local';
+  // 本地模式用独立的温度字段；云端保留原字段。无论哪种模式都保留云端字段原值，便于来回切换不丢配置。
+  const temperature = local
+    ? parseFloat($('localTemperature').value) || 0.5
+    : parseFloat($('temperature').value) || 0.2;
   return {
+    backend: local ? 'local' : 'cloud',
     provider: $('providerSelect').value,
     baseUrl: $('baseUrl').value.trim(),
     apiKey: $('apiKey').value.trim(),
     model: $('model').value.trim() || 'tc-code-latest',
-    temperature: parseFloat($('temperature').value) || 0.2,
+    temperature,
     topP: parseFloat($('topP').value) || 0,
     maxTokens: parseInt($('maxTokens').value, 10) || 0,
   };
@@ -129,6 +163,13 @@ async function testLlm() {
   setStatus('llmStatus', '测试中…');
   try {
     const cfg = collectLlm();
+    if (cfg.backend === 'local') {
+      // 本地 AI 依赖 chrome.offscreen，只能在 service worker 调用，故转发到 background
+      const resp = await chrome.runtime.sendMessage({ type: MSG.TEST_LOCAL_AI, cfg });
+      if (!resp || !resp.ok) throw new Error(resp?.error || '测试失败');
+      setStatus('llmStatus', '本地 AI 可用，返回: ' + (resp.content || '(空)'), 'ok');
+      return;
+    }
     const chatFn = makeChatFn(cfg);
     // 轻量探活：不跑完整 agent，只发一条消息确认连通与鉴权
     const resp = await chatFn(
@@ -136,12 +177,42 @@ async function testLlm() {
       null
     );
     if (resp && typeof resp.content === 'string') {
- setStatus('llmStatus', '连接成功，模型可用', 'ok');
+      setStatus('llmStatus', '连接成功，模型可用', 'ok');
     } else {
       setStatus('llmStatus', '连接成功，但返回内容异常', 'error');
     }
   } catch (e) {
     setStatus('llmStatus', '失败: ' + e.message, 'error');
+  }
+}
+
+// 检测 Chrome 内置本地 AI 可用性。chrome.offscreen 只能在 service worker 调用，
+// 故发送消息给 background 代为执行，返回 readily / after-download / no。
+async function checkLocalAi() {
+  setStatus('localStatus', '检测中…');
+  try {
+    const resp = await chrome.runtime.sendMessage({ type: MSG.CHECK_LOCAL_AI });
+    if (!resp || !resp.ok) throw new Error(resp?.error || '检测失败');
+    const s = resp.status;
+    if (s === 'readily') {
+      setStatus('localStatus', '本地 AI 可用，可直接使用', 'ok');
+    } else if (s === 'after-download') {
+      setStatus('localStatus', '模型尚未下载，需先在浏览器设置中下载后才能使用', 'error');
+    } else {
+      const info = resp.info || {};
+      const hw = [];
+      if (info.cpuCores) hw.push(`${info.cpuCores} 核 CPU`);
+      if (info.deviceMemory) hw.push(`${info.deviceMemory}GB 内存`);
+      const hwText = hw.length ? `（检测到 ${hw.join(' / ')}）` : '';
+      let hint = resp.detail ? ` 原因：${resp.detail}` : '';
+      setStatus(
+        'localStatus',
+        `本地 AI 不可用${hwText}。需满足：macOS 13+、可用磁盘 ≥22GB，且 GPU 显存 >4GB 或 CPU ≥16GB 内存 + ≥4 核。${hint}`,
+        'error'
+      );
+    }
+  } catch (e) {
+    setStatus('localStatus', '检测失败: ' + e.message, 'error');
   }
 }
 

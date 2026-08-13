@@ -146,6 +146,39 @@ select:focus {
   border-color: var(--primary);
 }
 
+/* 运行模式分段选择 */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.seg-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  background: var(--input);
+  border-right: 1px solid var(--border);
+}
+.seg-item:last-child {
+  border-right: none;
+}
+.seg-item input[type='radio'] {
+  margin: 0;
+  accent-color: var(--primary);
+}
+.seg-item:has(input:checked) {
+  background: #eaf1ff;
+  color: var(--primary);
+  font-weight: 600;
+}
+
 /* 高级设置折叠区 */
 details.advanced {
   margin-top: 12px;

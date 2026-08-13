@@ -11,12 +11,25 @@
   <h1>WebMold 设置</h1>
 
       <section class="card">
- <h2>模型接入（OpenAI 兼容）</h2>
+<h2>模型接入</h2>
    <p class="hint">
-          支持标准 OpenAI 及任何兼容 Chat Completions 的服务。API Key / 代理 token
-          仅存储在本地浏览器中。
+          支持标准 OpenAI 及任何兼容 Chat Completions 的服务；也可切换到 Chrome 内置本地 AI
+          （Gemini Nano），全程离线、无需自配 API Key。
         </p>
 
+        <div class="seg" role="radiogroup" aria-label="运行模式">
+          <label class="seg-item">
+            <input type="radio" name="backend" value="cloud" />
+            <span>云端 API</span>
+          </label>
+          <label class="seg-item">
+            <input type="radio" name="backend" value="local" />
+            <span>本地 Chrome AI</span>
+          </label>
+        </div>
+        <p id="backendHint" class="hint"></p>
+
+        <div id="cloudFields">
         <label>云厂商</label>
         <select id="providerSelect">
           <option value="">自定义 / 其他</option>
@@ -74,9 +87,24 @@
             <span id="modelsStatus" class="status"></span>
           </div>
         </details>
+        </div>
+
+        <div id="localFields" hidden>
+          <p class="hint">
+            使用 Chrome 内置的 Gemini Nano（Prompt API）在设备本地生成，全程离线、无需 API Key。
+            需要 Chrome 138 及以上版本，首次使用可能需先下载模型。本地模型不支持 function calling，
+            扩展会自动切换到简化的文本协议，能力略弱于云端模型。
+          </p>
+          <div class="row">
+            <button id="checkLocalAi" class="btn">检测本地 AI</button>
+            <span id="localStatus" class="status"></span>
+          </div>
+          <label>温度（0 ~ 2，越低越稳定）</label>
+          <input id="localTemperature" type="number" step="0.1" min="0" max="2" />
+        </div>
 
         <div class="row">
- <button id="saveLlm" class="btn primary">保存</button>
+<button id="saveLlm" class="btn primary">保存</button>
           <button id="testLlm" class="btn">测试连接</button>
           <span id="llmStatus" class="status"></span>
         </div>
