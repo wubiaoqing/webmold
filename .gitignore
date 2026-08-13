@@ -2,3 +2,13 @@
 /webmold.zip
 *.zip
 !docs/webmold.zip
+
+# CRX 打包产物（分发版在 docs/webmold.crx）
+*.crx
+!docs/webmold.crx
+
+# CRX 打包的临时构建目录
+/build/
+
+# CRX 签名私钥（决定扩展 ID，请自行备份；勿提交到公开仓库）
+/keys/

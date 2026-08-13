@@ -151,6 +151,9 @@
     border-bottom: 2px solid transparent; cursor: default;
   }
   .install-tabs .tab.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 500; }
+  .install-head .cta { display: flex; gap: 10px; flex-wrap: wrap; }
+  .install-item .way { font-weight: 600; color: var(--text); margin: 16px 0 8px; font-size: 14.5px; }
+  .install-item .way:first-child { margin-top: 0; }
   .install-item ol { padding-left: 20px; color: var(--text-dim); font-size: 14px; }
   .install-item li { margin-bottom: 7px; }
   .install-item code {
@@ -220,7 +223,7 @@
       内置 Agent 会在你的真实页面上探测结构、试跑方案、验证可行，最后生成 CSS/JS 规则注入生效，并按域名持久化。
     </p>
     <div class="cta">
-      <a class="btn-primary" href="#install">下载安装包 (zip)</a>
+      <a class="btn-primary" href="#install">立即安装</a>
       <a class="btn-ghost" href="#how">查看用法</a>
     </div>
 
@@ -285,7 +288,7 @@
     <div class="steps">
       <div class="step">
         <h3>安装并配置模型</h3>
-        <p>按下方安装区加载扩展，在设置页选择模型厂商（如腾讯云 Token Plan），填入自己的 <code>API Key</code> 并测试连接。</p>
+        <p>按下方安装区加载扩展，在设置页选择模型：填入 <code>API Key</code> 使用云端 API，或切换「本地 Chrome AI」模式离线使用（无需 Key）。</p>
       </div>
       <div class="step">
         <h3>打开网页，输入需求</h3>
@@ -302,33 +305,42 @@
 <section id="install">
   <div class="container">
     <h2>安装</h2>
-    <p class="lead">当前以开发者模式加载。商店版本正在准备中。</p>
+    <p class="lead">商店版本正在准备中，目前提供 zip 解压与 crx 拖入两种安装方式（均需开启「开发者模式」）。</p>
     <div class="install-wrap">
       <div class="install-head">
         <div class="file">
           <b>webmold.zip</b>
-          <span class="size mono">v0.1.0 · ~97 KB</span>
+          <span class="size mono">v0.1.0 · 114 KB</span>
+          <span style="margin: 0 10px; color: var(--text-dim);">/</span>
+          <b>webmold.crx</b>
+          <span class="size mono">v0.1.0 · 117 KB</span>
         </div>
-        <a class="btn-primary" href="webmold.zip" download>下载安装包</a>
+        <div class="cta">
+          <a class="btn-primary" href="webmold.zip" download>下载 zip</a>
+          <a class="btn-primary" href="webmold.crx" download>下载 crx</a>
+        </div>
       </div>
       <div class="install-body">
         <div class="install-tabs">
           <span class="tab on mono">chrome</span>
-          <span class="tab mono">edge / chromium</span>
         </div>
         <div class="install-item">
+          <p class="way">方式一：解压安装（zip）</p>
           <ol>
-            <li>下载上面的安装包并解压（解压后请勿移动或删除该文件夹）；</li>
-            <li>打开 Chrome，地址栏访问 <code>chrome://extensions</code>；</li>
-            <li>右上角开启「开发者模式」；</li>
-            <li>点击「加载已解压的扩展程序」，选择解压出来的文件夹；</li>
+            <li>下载 <code>webmold.zip</code> 并解压（解压后请勿移动或删除该文件夹）；</li>
+            <li>打开 <code>chrome://extensions</code>，开启「开发者模式」；</li>
+            <li>点「加载已解压的扩展程序」，选择解压出来的文件夹；</li>
             <li>把 WebMold 图标固定到工具栏即可使用。</li>
+          </ol>
+          <p class="way">方式二：CRX 安装（更省事）</p>
+          <ol>
+            <li>下载 <code>webmold.crx</code>；</li>
+            <li>打开 <code>chrome://extensions</code>，开启「开发者模式」；</li>
+            <li>把 <code>.crx</code> 文件直接拖入该页面即可完成安装。</li>
           </ol>
         </div>
         <div class="install-note">
-          Edge 用户访问 <code>edge://extensions</code> → 开启「开发人员模式」→「加载解压缩的扩展」，步骤一致。
-          <br><br>
-          首次打开会进入欢迎页；使用前需在设置页配置一个 OpenAI 兼容的模型服务（填入你自己的 API Key / Token）。
+          当前仅在 Chrome 浏览器验证通过。首次打开会进入欢迎页。使用前在设置页配置模型：填入你自己的 <code>API Key / Token</code> 使用云端 API，或切换「本地 Chrome AI」模式离线使用（无需 Key，需 Chrome 138+）。
         </div>
       </div>
     </div>

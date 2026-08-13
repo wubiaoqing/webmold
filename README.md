@@ -11,7 +11,8 @@
 - **按域名持久化**：规则以域名为维度保存，支持整站 / URL 前缀 / 精确 URL 三种生效范围。
 - **即时预览**：保存前可先预览效果，满意再落库。
 - **规则管理**：启用/停用、编辑、删除、导入/导出。
-- **OpenAI 兼容**：支持任何兼容 OpenAI Chat Completions 格式的服务；自动适配原生 function calling，不支持时降级为文本协议。
+- **模型自选**：支持任何兼容 OpenAI Chat Completions 格式的服务；自动适配原生 function calling，不支持时降级为文本协议。
+- **本地 AI 模式**：可切换到 Chrome 内置 Gemini Nano（Prompt API），全程离线、无需自配 API Key。
 - **本地优先**：规则与历史全部存于浏览器本地（`chrome.storage.local`），默认不上传任何数据。
 
 ## 目录结构
@@ -19,17 +20,20 @@
 ```
 manifest.json        MV3 配置
 background/service-worker.js    消息中枢 / 规则自动应用 / Agent 驱动与工具执行
+background/offscreen.html/.js   离屏文档：承载本地 AI（Gemini Nano / Prompt API）调用
 content/content-script.js       CSS 注入 / 页面上下文采集 / Agent 只读工具执行端 / 预览
 sidepanel/    侧边栏 UI：需求输入、Agent 过程展示、规则管理
 welcome/           首次安装引导页：三步用法 + 一键跳设置
-options/           设置页：模型接入、数据管理
+options/           设置页：模型接入（云端 / 本地）、数据管理
 lib/
   types.js         类型、常量、消息与工具名定义
   storage.js          存储层（chrome.storage.local 持久化）
+  safety.js          安全：对模型生成的 JS 做风险拦截（数据外发 / 危险操作）
   agent/
     runner.js    ★ Harness 内核：循环/步数/超时/重试/事件/协议适配（与业务解耦、可替换）
     tools.js           ToolRegistry：工具 schema 声明 + 执行器注册表
-    openai-chat.js     OpenAI 兼容 chatFn 适配器
+    openai-chat.js     OpenAI 兼容 chatFn 适配器（含本地 AI 分发）
+    local-chat.js      本地 AI 后端：offscreen 通信 + 文本降级 chatFn
     agent-service.js   业务编排：组装 prompt/registry 并驱动 runner
 assets/        图标
 ```
@@ -53,22 +57,40 @@ assets/        图标
 | `try_run_js` | 主世界试跑 JS 探测/验证（8s 超时，返回值+日志） | background + scripting |
 | `finish` | 输出最终规则 | runner 内拦截 |
 
-## 安装（开发者模式）
+## 安装
+
+WebMold 尚未上架 Chrome 商店，目前提供三种安装方式，任选其一即可。
+
+### 方式一：加载源码（开发者模式，适合开发调试）
 
 1. 打开 Chrome，访问 `chrome://extensions`。
 2. 右上角开启「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择本项目根目录。
 4. 固定 WebMold 图标到工具栏。
 
+### 方式二：解压安装包（zip，面向普通用户）
+
+1. 从落地页（`docs/index.html`）或 `docs/webmold.zip` 下载安装包并解压，解压后**请勿移动或删除该文件夹**；
+2. 打开 `chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」，选择解压出来的文件夹。
+
+### 方式三：安装 CRX 包（需开发者模式）
+
+1. 下载 `docs/webmold.crx`；
+2. 打开 `chrome://extensions` → 开启「开发者模式」；
+3. 将 `.crx` 文件**拖入**该页面即可安装。
+
+> 说明：现代 Chrome 已禁止普通拖拽安装未签名 CRX，需保持「开发者模式」开启；每次启动 Chrome 会提示停用开发者模式扩展，属正常现象。若需无提示的分发，请走 Chrome Web Store 或企业策略。
+
+Edge 用户对应地址为 `edge://extensions`（「开发人员模式」→「加载解压缩的扩展」），步骤一致。
+
 ## 使用
 
 >首次安装后会自动弹出**欢迎页**，介绍三步用法并提供「去配置模型」入口；
 > 侧边栏在未配置模型时也会顶部提示「还差一步就能用了」，点击即可跳转设置。
 
-1. 点击工具栏的 WebMold 图标先进入**设置页**（或点侧边栏右上角⚙）：
-   - **云厂商**：选择「腾讯云 Token Plan」会自动填入 BaseURL 并展示其支持的模型列表，你只需填写自己的 API Key（在腾讯云 Token Plan 控制台获取 `sk-tp-...` 代理 Token）。
-   - 也可选「自定义 / 其他」，手动填写任意 OpenAI 兼容服务的 BaseURL / API Key / 模型名称。
-   - 点「测试连接」确认可用。
+1. 点击工具栏的 WebMold 图标先进入**设置页**（或点侧边栏右上角⚙），在「模型接入」卡片选择运行模式：
+   - **云端 API**：选择「腾讯云 Token Plan」会自动填入 BaseURL 并展示其支持的模型列表，你只需填写自己的 API Key（在腾讯云 Token Plan 控制台获取 `sk-tp-...` 代理 Token）；也可选「自定义 / 其他」手动填写任意 OpenAI 兼容服务的 BaseURL / API Key / 模型名称。点「测试连接」确认可用。
+   - **本地 Chrome AI**：无需任何 API Key，使用 Chrome 内置 Gemini Nano 在设备本地生成（需 Chrome 138+ 且满足硬件要求）。点「检测本地 AI」确认可用后即可使用；本地模型不支持 function calling，扩展会自动降级为文本协议。
 2. 打开任意网站，点击 WebMold 图标打开**侧边栏**。
 3. 在输入框描述需求 → 点「生成定制」。可在「Agent 运行过程」区看到它如何探测页面、试跑、最终产出。
 4. 查看生成的 CSS/JS（可手动微调）→ 点「预览」查看效果。
@@ -132,7 +154,8 @@ harness 内核集中承载了循环/超时/重试/事件等能力，后续要增
 
 - `docs/index.html` —— 产品主页（介绍 + 安装引导 + 隐私安全）
 - `docs/privacy.html` —— 隐私政策（Chrome 商店提审时可直接引用其 URL）
-- `docs/webmold.zip` —— 分发给用户的安装包（与根目录 zip 同步更新）
+- `docs/webmold.zip` —— 解压式安装包（面向普通用户）
+- `docs/webmold.crx` —— CRX 安装包（开发者模式拖入即可）
 - `docs/assets/` —— 图标资源（来自 `assets/`）
 
 ### 开启方式（约 1 分钟）
@@ -145,4 +168,11 @@ harness 内核集中承载了循环/超时/重试/事件等能力，后续要增
 
 ### 更新安装包
 
-每次发布新版时，把重新打包的 `webmold.zip` 覆盖到 `docs/webmold.zip` 并推送即可，主页下载链接自动指向最新版。
+每次发布新版时，在项目根目录执行以下脚本重新打包，再推送即可（主页下载链接自动指向最新版）：
+
+```bash
+./package.sh       # 打包 docs/webmold.zip（解压式安装包）
+./package-crx.sh   # 打包 docs/webmold.crx（CRX 安装包，首次会生成并保存 keys/webmold.pem）
+```
+
+> 注意：`keys/webmold.pem` 是 CRX 签名私钥，决定扩展 ID，务必妥善备份且**不要提交到公开仓库**（已在 `.gitignore` 中忽略）。

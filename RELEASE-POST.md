@@ -17,7 +17,8 @@
 - **按域名持久化**：规则以域名为维度保存，支持整站 / URL 前缀 / 精确 URL 三种生效范围；
 - **即时预览**：保存前先预览效果，满意再落库；
 - **规则管理**：启用 / 停用 / 编辑 / 删除 / 导入导出；
-- **模型自选**：OpenAI 兼容协议，内置腾讯云 Token Plan 模型清单（GLM / Kimi / DeepSeek / MiniMax / DeepSeek 原厂直供等），也支持接入任何自建服务。
+- **模型自选**：OpenAI 兼容协议，内置腾讯云 Token Plan 模型清单（GLM / Kimi / DeepSeek / MiniMax / DeepSeek 原厂直供等），也支持接入任何自建服务；
+- **本地 AI 模式**：可选 Chrome 内置 Gemini Nano，全程离线、无需自配 API Key。
 
 ## 隐私与安全
 
@@ -28,9 +29,15 @@
 
 ## 安装
 
-当前通过 Chrome 开发者模式加载（`chrome://extensions` → 开启开发者模式 → 加载已解压的扩展程序）。商店版本正在准备中，有进展会回来更新。
+商店版本正在准备中，目前提供两种安装方式（均需在 `chrome://extensions` 开启「开发者模式」）：
 
-使用前需要在设置页配置一个 OpenAI 兼容的模型服务（选择厂商后填入自己的 API Key / Token 即可）。
+1. **解压安装包**：下载 `webmold.zip` 解压后，「加载已解压的扩展程序」选择该文件夹；
+2. **CRX 安装包**：下载 `webmold.crx`，直接拖入扩展页面即可。
+
+使用前在设置页二选一配置模型：
+
+- **云端 API**：选择厂商后填入自己的 API Key / Token（如腾讯云 Token Plan）；
+- **本地 Chrome AI**：无需 Key，点「检测本地 AI」确认可用即可（需 Chrome 138+ 及满足硬件要求）。
 
 ## 一些说明
 
