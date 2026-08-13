@@ -187,27 +187,37 @@ async function testLlm() {
 }
 
 // 检测 Chrome 内置本地 AI 可用性。chrome.offscreen 只能在 service worker 调用，
-// 故发送消息给 background 代为执行，返回 readily / after-download / no。
+// 故发送消息给 background 代为执行。
+// availability() 返回值：available / downloadable / downloading / unavailable（旧版可能为
+// readily / after-download / no，这里两套都兼容）。
 async function checkLocalAi() {
   setStatus('localStatus', '检测中…');
   try {
     const resp = await chrome.runtime.sendMessage({ type: MSG.CHECK_LOCAL_AI });
     if (!resp || !resp.ok) throw new Error(resp?.error || '检测失败');
     const s = resp.status;
-    if (s === 'readily') {
+    if (s === 'available' || s === 'readily') {
       setStatus('localStatus', '本地 AI 可用，可直接使用', 'ok');
-    } else if (s === 'after-download') {
-      setStatus('localStatus', '模型尚未下载，需先在浏览器设置中下载后才能使用', 'error');
+    } else if (s === 'downloadable' || s === 'after-download') {
+      setStatus(
+        'localStatus',
+        '设备满足要求，但模型尚未下载。请到 chrome://on-device-internals 下载 Gemini Nano，完成后重试',
+        'error'
+      );
+    } else if (s === 'downloading') {
+      setStatus('localStatus', '模型正在下载中，稍后重试', 'error');
     } else {
       const info = resp.info || {};
-      const hw = [];
-      if (info.cpuCores) hw.push(`${info.cpuCores} 核 CPU`);
-      if (info.deviceMemory) hw.push(`${info.deviceMemory}GB 内存`);
-      const hwText = hw.length ? `（检测到 ${hw.join(' / ')}）` : '';
+      const cpu = info.cpuCores || 0;
+      const mem = info.deviceMemory || 0;
+      const parts = [];
+      if (cpu) parts.push(`CPU ${cpu} 核`);
+      if (mem) parts.push(`内存 ${mem}GB`);
+      const hwText = parts.length ? `（检测到 ${parts.join(' / ')}）` : '';
       let hint = resp.detail ? ` 原因：${resp.detail}` : '';
       setStatus(
         'localStatus',
-        `本地 AI 不可用${hwText}。需满足：macOS 13+、可用磁盘 ≥22GB，且 GPU 显存 >4GB 或 CPU ≥16GB 内存 + ≥4 核。${hint}`,
+        `本地 AI 不可用${hwText}。硬件门槛会随版本变化，请打开 chrome://on-device-internals 查看 Manifest Criteria 逐项确认哪项未通过。${hint}`,
         'error'
       );
     }

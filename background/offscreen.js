@@ -50,15 +50,20 @@ function destroySession() {
 
 async function handleAvailability() {
   const LM = detectApi();
-  let status = 'no';
+  let status = 'unavailable';
   let detail = '';
   try {
     // 与 create()/prompt() 保持一致的 options：均不指定 expectedInputLanguages，使用默认。
     // 之前这里传了 ['zh','en'] 而 create 没传，两者不一致会导致误报「不支持」。
+    // 返回值枚举：available / downloadable / downloading / unavailable。
     status = await LM.availability();
   } catch (e) {
     detail = String(e?.message || e);
   }
+
+  // 注意：不要用 navigator.storage.estimate() 推算「磁盘可用空间」——它返回的是
+  // 存储配额（quota）而非物理磁盘剩余空间，会严重低估并误报「磁盘不足」。
+  // 磁盘是否达标只能到 chrome://on-device-internals 查看。
   return {
     ok: true,
     status,
