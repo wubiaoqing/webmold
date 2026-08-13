@@ -1078,6 +1078,21 @@ function renderAgentEvent(ev) {
       }
       break;
     }
+    case 'llm_response': {
+      // 非流式后端（本地 Prompt API）不会推送 llm_delta，此事件携带完整返回。
+      // 若当前思考项尚未收到任何流式内容，就用完整返回兜底填充并收尾，
+      // 否则「思考中…」会永久悬挂（本地 AI 模式下每步都停在思考中的直接原因）。
+      if (_thinkingItem && !_thinkBuf && !_replyBuf) {
+        const text = String(ev.data?.content || '').trim();
+        if (text) {
+          _replyBuf = text;
+          const streamEl = _thinkingItem.querySelector('.think-stream');
+          if (streamEl) streamEl.textContent = text;
+        }
+        finalizeThinking(text ? undefined : '（未返回思考过程）');
+      }
+      break;
+    }
     case 'tool_call': {
       const reason = ev.data?.args?.reason;
       // 无思考文案时，用「这步准备调什么工具、为什么」作占位，避免空白

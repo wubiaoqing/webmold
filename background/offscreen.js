@@ -83,7 +83,12 @@ async function handlePrompt({ systemPrompt, initialPrompts, prompt, temperature 
   if (Array.isArray(initialPrompts) && initialPrompts.length) {
     createOpts.initialPrompts = initialPrompts;
   }
-  if (typeof temperature === 'number') createOpts.temperature = temperature;
+  // Prompt API 要求：temperature 与 topK 必须「同时提供，或都不提供」。
+  // 只传其一会报错 "must either specify both topK and temperature, or neither of them"。
+  if (typeof temperature === 'number') {
+    createOpts.temperature = temperature;
+    createOpts.topK = 40;
+  }
 
   try {
     destroySession();

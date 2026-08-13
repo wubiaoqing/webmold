@@ -201,7 +201,7 @@ async function checkLocalAi() {
     } else if (s === 'downloadable' || s === 'after-download') {
       setStatus(
         'localStatus',
-        '设备满足要求，但模型尚未下载。请到 chrome://on-device-internals 下载 Gemini Nano，完成后重试',
+        '设备满足要求，但模型尚未下载。请打开 chrome://components，对「Optimization Guide On Device Model」点「检查更新」下载约 4GB 模型，完成后重试',
         'error'
       );
     } else if (s === 'downloading') {
