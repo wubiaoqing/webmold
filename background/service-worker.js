@@ -8,7 +8,7 @@
 //  4) 打开侧边栏
 
 import { MSG, AGENT_TOOL, AGENT_LIFECYCLE, AGENT_ASK, BRIDGE, domainFromUrl, uid } from '../lib/types.js';
-import { getLlmConfig, getRulesByDomain, addHistorySession } from '../lib/storage.js';
+import { getLlmConfig, getRulesByDomain, upsertHistorySession } from '../lib/storage.js';
 import { runCustomizeAgent } from '../lib/agent/agent-service.js';
 import { makeChatFn } from '../lib/agent/openai-chat.js';
 import { checkLocalAiAvailability } from '../lib/agent/local-chat.js';
@@ -445,6 +445,7 @@ tool,
 //     时通过 GET_TASK_STATE 拉取此状态即可恢复 UI，从而实现「收起侧边栏不中断任务」。
 const sessions = new Map(); // tabId -> Array<{role:'user'|'assistant', content:string}>
 const runningTasks = new Map(); // tabId -> Task（见上）
+const sessionIdByTab = new Map(); // tabId -> { sessionId, domain }：当前对话会话及其归属域名；域名变化时开启新会话，保证历史严格按域名隔离
 
 // ask_user_question 挂起表：askId -> { resolve, timer, tabId }
 // agent 调用该工具时不能同步返回，而是把问题推给 sidepanel 并在此登记一个 resolver；
@@ -518,24 +519,29 @@ function getHistory(tabId) {
   return sessions.get(tabId) || [];
 }
 
+/** 把一条最终结果压缩为供后续轮次使用的上下文摘要 */
+function summarizeResult(result, prompt) {
+  if (!result) return '';
+  if (result.mode === 'answer') {
+    // 问答类产出：只保留问题与答案摘要，避免把长答案塞进后续每一轮上下文
+    return (
+      `问答：${String(prompt || '').slice(0, 100)}` +
+      `\n回答：${String(result.answer || result.explanation || '').slice(0, 500)}`
+    );
+  }
+  // 规则类产出：只放标题/说明/代码长度，避免把大段 css/js 塞进后续每一轮上下文
+  return (
+    `已生成规则：${result.title || '未命名规则'}` +
+    (result.explanation ? `\n说明：${String(result.explanation).slice(0, 500)}` : '') +
+    `\n（含 CSS ${((result.css || '').length)} 字、JS ${((result.js || '').length)} 字）`
+  );
+}
+
 /** 把本轮的用户需求与最终产出摘要追加进会话历史，并做长度裁剪 */
 function pushHistory(tabId, userPrompt, result) {
   const hist = sessions.get(tabId) || [];
   hist.push({ role: 'user', content: String(userPrompt || '').slice(0, 2000) });
-  let summary;
-  if (result?.mode === 'answer') {
-    // 问答类产出：只保留问题与答案摘要，避免把长答案塞进后续每一轮上下文
-    summary =
-      `问答：${String(userPrompt || '').slice(0, 100)}` +
-      `\n回答：${String(result?.answer || result?.explanation || '').slice(0, 500)}`;
-  } else {
-    // 规则类产出：只放标题/说明/代码长度，避免把大段 css/js 塞进后续每一轮上下文
-    summary =
-      `已生成规则：${result?.title || '未命名规则'}` +
-      (result?.explanation ? `\n说明：${String(result.explanation).slice(0, 500)}` : '') +
-      `\n（含 CSS ${((result?.css || '').length)} 字、JS ${((result?.js || '').length)} 字）`;
-  }
-  hist.push({ role: 'assistant', content: summary });
+  hist.push({ role: 'assistant', content: summarizeResult(result, userPrompt) });
   // 只保留最近 N 条
   while (hist.length > MAX_HISTORY_MESSAGES) hist.shift();
   sessions.set(tabId, hist);
@@ -543,6 +549,8 @@ function pushHistory(tabId, userPrompt, result) {
 
 function clearSession(tabId) {
   sessions.delete(tabId);
+  // 「新建对话」重置当前会话 id：下一次问答会开启一条新的历史会话
+  sessionIdByTab.delete(tabId);
   // 若该 tab 有已结束（非 running）的任务记录，一并清除，避免下次打开又回放上一轮结果
   const task = runningTasks.get(tabId);
   if (task && task.status !== 'running') {
@@ -553,6 +561,7 @@ function clearSession(tabId) {
 // 标签页关闭时清理其会话与运行中的任务，避免泄漏
 chrome.tabs.onRemoved.addListener((tabId) => {
   sessions.delete(tabId);
+  sessionIdByTab.delete(tabId);
   resolvePendingAsksForTab(tabId, '标签页已关闭');
   const task = runningTasks.get(tabId);
   if (task) {
@@ -579,14 +588,44 @@ chrome.webNavigation?.onHistoryStateUpdated?.addListener((d) => {
 // 以便 sidepanel 关闭后重新打开时能回放本轮完整进度。
 function emitAgentEvent(tabId, ev) {
   const task = runningTasks.get(tabId);
-  if (task) {
+  // volatile 事件（如每步的完整提示词 llm_prompt）体积大，仅实时转发给界面当次展示，
+  // 不缓存进 task.events，从而也不会落库到历史会话，避免 chrome.storage 膨胀。
+  if (task && !ev.volatile) {
     task.events.push(ev);
     if (task.events.length > MAX_TASK_EVENTS) {
       task.events.splice(0, task.events.length - MAX_TASK_EVENTS);
     }
   }
+  // 模型输入/输出（llm_prompt 的完整 messages、llm_response 的正文与工具调用）额外收集到
+  // task.trace（仅内存、不落库），供「导出分析」一键导出，方便排查模型行为。
+  // 注意：llm_prompt 是 volatile 事件，不进 events/历史库，但这里要进 trace。
+  if (task && (ev.type === 'llm_prompt' || ev.type === 'llm_response')) {
+    collectTrace(task, ev);
+  }
   // 带上 tabId，便于 sidepanel 过滤只属于当前 tab 的事件
   chrome.runtime.sendMessage({ type: MSG.AGENT_EVENT, tabId, event: ev }).catch(() => {});
+}
+
+// 单个任务 trace 最多缓存的模型交互条数（prompt+response 成对，即约可覆盖 200 轮工具调用），
+// 超出丢弃最旧，避免长任务导致内存膨胀。
+const MAX_TRACE_ITEMS = 400;
+
+/**
+ * 把一条模型输入/输出事件追加进 task.trace（内存快照，不落库）。
+ * ev.data.messages 在 runner 侧已用 slice() 浅拷贝，元素对象后续不会被修改，直接持引用即可。
+ * @param {object} task runningTasks 里的任务对象
+ * @param {{type:string, step?:number, data?:object}} ev
+ */
+function collectTrace(task, ev) {
+  if (!task.trace) task.trace = [];
+  task.trace.push({
+    step: ev.step,
+    type: ev.type,
+    data: ev.data,
+  });
+  if (task.trace.length > MAX_TRACE_ITEMS) {
+    task.trace.splice(0, task.trace.length - MAX_TRACE_ITEMS);
+  }
 }
 
 /**
@@ -598,15 +637,22 @@ function emitAgentEvent(tabId, ev) {
 async function persistHistory(task, status) {
   if (!task || !task.domain) return;
   try {
-    await addHistorySession({
-      id: uid(),
+    // 用任务携带的 sessionId 归并：同一对话会话内的多轮问答落到同一条历史记录（turns 数组），
+    // 而不是每条问答各存一条。
+    await upsertHistorySession({
+      id: task.sessionId || uid(),
       domain: task.domain,
       prompt: task.prompt || '',
       events: Array.isArray(task.events) ? task.events : [],
+      // 持久化本轮模型的输入/输出快照（llm_prompt/llm_response），供历史会话「导出分析」使用。
+      // 内存里已按 MAX_TRACE_ITEMS 裁剪，这里直接存引用即可；老数据没有 trace 时前端用 events 兜底。
+      trace: Array.isArray(task.trace) ? task.trace : [],
+      backend: task.backend || '',
+      model: task.model || '',
       result: status === 'done' ? task.result || null : null,
       status,
       error: task.error || '',
-      createdAt: Date.now(),
+      createdAt: task.startedAt || Date.now(),
     });
   } catch (e) {
     console.warn('[WebMold] 历史会话落库失败:', e);
@@ -621,6 +667,9 @@ async function persistHistory(task, status) {
 async function runGenerateTask({ tabId, prompt, pageContext, existingRule, options, task }) {
   try {
     const cfg = await getLlmConfig();
+    // 记录本次生成所用后端/模型，随历史会话一起落库，供导出分析时标注来源。
+    task.backend = cfg.backend || '';
+    task.model = cfg.model || '';
     const executors = buildExecutors(tabId);
 
     // 自动识别：非手动编辑态（未显式传 existingRule）时，取当前域名下已有规则作为候选，
@@ -760,17 +809,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       const controller = new AbortController();
+      // 会话严格按域名隔离：同一域名下从「新建对话」到下一次「新建对话」之间复用同一 id 归并多轮；
+      // 一旦域名变化（如同 tab 跳转到别的站点），立即开启新会话，避免跨域名归并到错误的历史会话。
+      const domain = domainFromUrl(pageContext?.url || '');
+      let session = sessionIdByTab.get(tabId);
+      if (!session || session.domain !== domain) {
+        session = { sessionId: uid(), domain };
+        sessionIdByTab.set(tabId, session);
+      }
+      const sessionId = session.sessionId;
       // 初始化本轮任务状态并保活；agent 事件写入 task.events
       const task = {
         controller,
         status: 'running',
         prompt: String(prompt || ''),
-        domain: domainFromUrl(pageContext?.url || ''),
+        domain,
         existing: !!existingRule,
         events: [],
+        trace: [],
         result: null,
         error: '',
         startedAt: Date.now(),
+        sessionId,
       };
       runningTasks.set(tabId, task);
       ensureKeepAlive();
@@ -826,6 +886,57 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const { tabId } = msg;
       if (tabId != null) clearSession(tabId);
       sendResponse({ ok: true });
+      return false;
+    }
+
+    case MSG.RESUME_SESSION: {
+      // sidepanel 点击某条历史会话后：把当前 tab 的会话 id 切到这条历史会话，
+      // 并重建多轮上下文，这样后续问答会归并进这条历史会话（而不是新建），Agent 也能接着之前的对话继续。
+      const { tabId, sessionId, domain, turns } = msg;
+      if (tabId == null) {
+        sendResponse({ ok: false, error: '缺少 tabId' });
+        return false;
+      }
+      if (sessionId) {
+        // 绑定域名：仅当前域命中这条历史会话时才允许「接着聊」；域名变化后 GENERATE_RULE 会自动开启新会话
+        sessionIdByTab.set(tabId, { sessionId, domain: domain || '' });
+      } else {
+        sessionIdByTab.delete(tabId);
+      }
+      // 重建会话上下文：把历史每一轮（用户输入 + 产出摘要）回填进 sessions，供 Agent 接着聊
+      const hist = [];
+      for (const t of Array.isArray(turns) ? turns : []) {
+        hist.push({ role: 'user', content: String(t?.prompt || '').slice(0, 2000) });
+        hist.push({ role: 'assistant', content: summarizeResult(t?.result, t?.prompt) });
+      }
+      while (hist.length > MAX_HISTORY_MESSAGES) hist.shift();
+      sessions.set(tabId, hist);
+      // 清掉该 tab 已结束的旧任务记录，避免下次 GET_TASK_STATE 回放出旧结果
+      const task = runningTasks.get(tabId);
+      if (task && task.status !== 'running') runningTasks.delete(tabId);
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    case MSG.EXPORT_TRACE: {
+      // 导出本轮任务的模型输入/输出 trace（内存里的 llm_prompt/llm_response 快照）。
+      // 同步返回即可：trace 已收集在 runningTasks 里，无需等待 agent。
+      const { tabId } = msg;
+      const task = tabId != null ? runningTasks.get(tabId) : null;
+      if (!task || !Array.isArray(task.trace) || !task.trace.length) {
+        sendResponse({ ok: false, error: '暂无模型交互记录可导出，请先完成一次生成。' });
+        return false;
+      }
+      sendResponse({
+        ok: true,
+        trace: task.trace,
+        meta: {
+          domain: task.domain || '',
+          prompt: task.prompt || '',
+          status: task.status || '',
+          startedAt: task.startedAt || 0,
+        },
+      });
       return false;
     }
 

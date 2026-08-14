@@ -48,6 +48,34 @@ function destroySession() {
   }
 }
 
+/**
+ * 构造本地模型的输出约束 schema。
+ * 约束模型只输出如下形态的 JSON 对象（工具名被 enum 白名单强制，仅 tool+args 两个字段）：
+ *   {"tool":"query_dom","args":{...}}   —— 调用某个工具
+ *   {"tool":"finish","args":{...}}       —— 完成（rule/answer 两种模式，闲聊走 finish 的 mode="answer"）
+ *
+ * 关键设计（针对本地小模型对结构化输出的理解偏差）：
+ *   · 只保留 tool + args 两个字段，且 required 强制二者必填、additionalProperties 禁止额外字段。
+ *     之前多出的顶层 answer 字段会让小模型误以为「可以边调工具边写答案」，把最终 CSS 塞进
+ *     answer 却被 runner 丢弃，导致既不 finish 又反复调工具的死循环。
+ *   · 若实现不支持 required/additionalProperties 而报错，外层 handlePrompt 会降级为不带约束调用。
+ * @param {string[]} toolNames
+ * @returns {object|null} 无工具名时不返回约束
+ */
+function buildToolResponseConstraint(toolNames) {
+  const names = Array.isArray(toolNames) ? toolNames.filter(Boolean) : [];
+  if (!names.length) return null;
+  return {
+    type: 'object',
+    properties: {
+      tool: { type: 'string', enum: names },
+      args: { type: 'object' },
+    },
+    required: ['tool', 'args'],
+    additionalProperties: false,
+  };
+}
+
 async function handleAvailability() {
   const LM = detectApi();
   let status = 'unavailable';
@@ -76,7 +104,7 @@ async function handleAvailability() {
   };
 }
 
-async function handlePrompt({ systemPrompt, initialPrompts, prompt, temperature }) {
+async function handlePrompt({ systemPrompt, initialPrompts, prompt, temperature, toolNames }) {
   const LM = detectApi();
   const createOpts = {};
   if (systemPrompt) createOpts.systemPrompt = systemPrompt;
@@ -90,11 +118,32 @@ async function handlePrompt({ systemPrompt, initialPrompts, prompt, temperature 
     createOpts.topK = 40;
   }
 
+  // 本地模型无 function calling。用 responseConstraint（JSON Schema）强制模型输出约定的
+  // 工具调用 JSON，从根上避免「模型吐出的 JSON 格式不合规 → 解析失败 → 死循环」。
+  const constraint = buildToolResponseConstraint(toolNames);
+
   try {
     destroySession();
     const session = await LM.create(createOpts);
     currentSession = session;
-    const content = await session.prompt(prompt || '');
+
+    let content;
+    if (constraint) {
+      try {
+        content = await session.prompt(prompt || '', { responseConstraint: constraint });
+      } catch (e) {
+        // responseConstraint 在部分旧版本 / 环境可能不被支持，或对 required/additionalProperties
+        // 等关键字报错：一律降级为不带约束的普通调用，仍由 runner 侧文本容错解析 + 兜底处理。
+        if (/constraint|not support|unsupported|invalid|schema|propert|required|additional/i.test(String(e?.message || e))) {
+          content = await session.prompt(prompt || '');
+        } else {
+          throw e;
+        }
+      }
+    } else {
+      content = await session.prompt(prompt || '');
+    }
+
     return { ok: true, content };
   } catch (e) {
     const msg = String(e?.message || e);

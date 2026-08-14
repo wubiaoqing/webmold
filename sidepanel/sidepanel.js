@@ -34,10 +34,12 @@ const els = {
   // 整页滚动容器（对话区、结果区、规则列表都在其中）
   mainContent: document.querySelector('main.content'),
   historyBtn: $('historyBtn'),
+  exportTraceBtn: $('exportTraceBtn'),
   backToLiveBtn: $('backToLiveBtn'),
   historyPanel: $('historyPanel'),
   historyList: $('historyList'),
   clearHistoryBtn: $('clearHistoryBtn'),
+  closeHistoryBtn: $('closeHistoryBtn'),
   resultPanel: $('resultPanel'),
   resultTitle: $('resultTitle'),
   resultExplain: $('resultExplain'),
@@ -269,7 +271,11 @@ function bindEvents() {
   els.stopBtn.addEventListener('click', onStop);
   els.newSessionBtn.addEventListener('click', onNewSession);
   els.historyBtn.addEventListener('click', toggleHistoryPanel);
+  els.exportTraceBtn.addEventListener('click', onExportTrace);
   els.backToLiveBtn.addEventListener('click', exitHistoryReplay);
+  els.closeHistoryBtn.addEventListener('click', () => {
+    els.historyPanel.classList.add('hidden');
+  });
   els.clearHistoryBtn.addEventListener('click', async () => {
     if (!currentDomain) return;
     if (!confirm('清空本站全部历史会话？')) return;
@@ -633,7 +639,6 @@ async function toggleHistoryPanel() {
   els.historyPanel.classList.toggle('hidden', !willShow);
   if (willShow) {
     await renderHistoryList();
-    els.historyPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
 
@@ -657,7 +662,23 @@ async function renderHistoryList() {
 const STATUS_ICON = { done: '✓', failed: '✕', aborted: '■' };
 const STATUS_TEXT = { done: '已完成', failed: '失败', aborted: '已停止' };
 
+/** 归一化历史会话的轮次数组（兼容老数据：无 turns 字段时退化为单轮） */
+function getSessionTurns(s) {
+  if (Array.isArray(s.turns) && s.turns.length) return s.turns;
+  return [{
+    prompt: s.prompt || '',
+    events: Array.isArray(s.events) ? s.events : [],
+    trace: Array.isArray(s.trace) ? s.trace : [],
+    result: s.result ?? null,
+    status: s.status || '',
+    error: s.error || '',
+    createdAt: s.createdAt || 0,
+  }];
+}
+
 function renderHistoryItem(s) {
+  const turns = getSessionTurns(s);
+  const firstPrompt = turns.length ? (turns[0].prompt || '') : (s.prompt || '');
   const li = document.createElement('li');
   li.className = 'history-item ' + (s.status || 'done');
 
@@ -670,8 +691,17 @@ function renderHistoryItem(s) {
 
   const p = document.createElement('div');
   p.className = 'hi-prompt';
-  p.textContent = s.prompt || '(无输入)';
-  p.title = s.prompt || '';
+  p.textContent = firstPrompt || '(无输入)';
+  p.title = firstPrompt || '';
+
+  const exp = document.createElement('button');
+  exp.className = 'hi-export';
+  exp.textContent = '⬇';
+  exp.title = '导出这条会话的模型输入/输出';
+  exp.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onExportHistory(s);
+  });
 
   const del = document.createElement('button');
   del.className = 'hi-del';
@@ -684,38 +714,72 @@ function renderHistoryItem(s) {
     setStatus('已删除该历史会话', 'ok');
   });
 
-  top.append(st, p, del);
+  top.append(st, p, exp, del);
 
   const meta = document.createElement('div');
   meta.className = 'hi-meta';
   const time = s.createdAt ? new Date(s.createdAt).toLocaleString() : '';
-  meta.textContent = `${STATUS_TEXT[s.status] || '已完成'} · ${time}`;
+  const rounds = turns.length > 1 ? `共 ${turns.length} 轮 · ` : '';
+  meta.textContent = `${rounds}${STATUS_TEXT[s.status] || '已完成'} · ${time}`;
 
   li.append(top, meta);
-  // 点击整条：在对话区回放该历史会话
-  li.addEventListener('click', () => replayHistorySession(s));
+  // 点击整条：载入该历史会话并接着它继续聊（关闭面板 + 归并到该会话）
+  li.addEventListener('click', () => resumeHistorySession(s));
   return li;
 }
 
 /**
- * 在对话区回放一条历史会话的完整对话过程（用户输入 + Agent 过程 + 结果）。
- * 进入「只读回放」视图：暂停实时事件渲染，顶部给出返回入口。
+ * 载入一条历史会话并「接着它继续聊」：
+ * 关闭历史面板，把该会话的多轮内容渲染进对话区，并把当前 tab 的会话 id 切到这条历史，
+ * 之后继续提问会归并进这条历史会话（而不是新建）。
  */
-function replayHistorySession(s) {
-  viewingHistory = true;
-  activeTurn = null; // 回放期间不接收实时事件
+async function resumeHistorySession(s) {
+  const turns = getSessionTurns(s);
+
+  // 关闭历史面板，退出只读态，进入可继续对话的 live 视图
+  els.historyPanel.classList.add('hidden');
+  viewingHistory = false;
+  activeTurn = null;
+  els.backToLiveBtn.classList.add('hidden');
+  els.historyBtn.classList.remove('hidden');
   els.conversation.innerHTML = '';
+  _currentTrace = null;
 
   // 顶部提示条
   const tip = document.createElement('div');
   tip.className = 'conv-replay-tip';
   const time = s.createdAt ? new Date(s.createdAt).toLocaleString() : '';
-  tip.textContent = `正在查看历史会话（${time}），点右上角「返回」回到当前会话`;
+  tip.textContent = turns.length > 1
+    ? `已载入历史会话（${time}，共 ${turns.length} 轮），可继续提问`
+    : `已载入历史会话（${time}），可继续提问`;
   els.conversation.appendChild(tip);
 
-  // 重建这一轮的用户气泡 + 助手气泡，并回放过程事件
-  const turn = startTurn(s.prompt || '');
-  const events = Array.isArray(s.events) ? s.events : [];
+  // 逐轮回放（用户气泡 + Agent 过程 + 结果气泡）
+  for (const t of turns) replayTurn(t);
+
+  // 通知 background：把当前 tab 的会话 id 切到这条历史会话，后续问答归并到这里
+  if (currentTab) {
+    try {
+      await sendMsg({
+        type: MSG.RESUME_SESSION,
+        tabId: currentTab.id,
+        sessionId: s.id,
+        domain: s.domain || currentDomain,
+        turns,
+      });
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  setStatus('已载入历史会话，可继续提问', 'ok');
+  els.conversation.scrollTop = 0;
+}
+
+/** 回放单轮问答：用户气泡 + Agent 过程 + 结果气泡 */
+function replayTurn(t) {
+  const turn = startTurn(t.prompt || '');
+  const events = Array.isArray(t.events) ? t.events : [];
   for (const ev of events) {
     if (
       ev &&
@@ -729,14 +793,14 @@ function replayHistorySession(s) {
   }
 
   // 收尾气泡（根据终态）
-  if (s.status === 'done' && s.result) {
-    const { title, css, js, explanation, mode } = s.result;
+  if (t.status === 'done' && t.result) {
+    const { title, css, js, explanation, mode } = t.result;
     if (mode === 'answer') {
       // 问答类历史：渲染答案气泡
       finishTurn(turn, {
         state: 'done',
         title: '回答完成',
-        summaryHtml: renderMarkdown(s.result.answer || explanation || ''),
+        summaryHtml: renderMarkdown(t.result.answer || explanation || ''),
       });
     } else {
       finishTurn(turn, {
@@ -747,19 +811,13 @@ function replayHistorySession(s) {
         js,
       });
     }
-  } else if (s.status === 'aborted') {
-    finishTurn(turn, { state: 'error', title: '已停止', summary: s.error || '已手动停止本次生成' });
-  } else if (s.status === 'failed') {
-    finishTurn(turn, { state: 'error', title: '生成失败', summary: s.error || '生成失败' });
+  } else if (t.status === 'aborted') {
+    finishTurn(turn, { state: 'error', title: '已停止', summary: t.error || '已手动停止本次生成' });
+  } else if (t.status === 'failed') {
+    finishTurn(turn, { state: 'error', title: '生成失败', summary: t.error || '生成失败' });
   } else {
     finishTurn(turn, { state: 'done', title: '已完成', summary: '' });
   }
-
-  // 展示返回入口
-  els.backToLiveBtn.classList.remove('hidden');
-  els.historyBtn.classList.add('hidden');
-  setStatus('历史会话（只读）', '');
-  els.conversation.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /** 退出历史回放，返回当前会话（重新拉取后台任务状态恢复实时视图） */
@@ -1014,6 +1072,60 @@ function preview(obj, max = 400) {
   return esc(s);
 }
 
+/** 把一轮完整 messages（system/user/assistant/tool）格式化成人可读文本，供调试折叠块展示 */
+function formatMessagesForDebug(messages) {
+  if (!Array.isArray(messages)) return '(无消息)';
+  return messages
+    .map((m, i) => {
+      const role = m?.role || 'unknown';
+      let body;
+      if (typeof m?.content === 'string') body = m.content;
+      else if (m?.content == null) body = '';
+      else body = JSON.stringify(m.content);
+      // 原生 tools 协议下，assistant 消息可能携带 tool_calls
+      if (Array.isArray(m?.tool_calls) && m.tool_calls.length) {
+        const tcs = m.tool_calls
+          .map((tc) => {
+            const fn = tc?.function || tc;
+            const args = typeof fn.arguments === 'string' ? fn.arguments : JSON.stringify(fn.arguments);
+            return `{name:${fn.name}, args:${args}}`;
+          })
+          .join('\n  ');
+        body += (body ? '\n' : '') + '[tool_calls]\n  ' + tcs;
+      }
+      // 原生 tools 协议下，tool 角色的消息回带 tool_call_id
+      if (role === 'tool' && m?.tool_call_id) {
+        body = `(tool_call_id=${m.tool_call_id})\n` + body;
+      }
+      return `───── [${i + 1}] ${role} ─────\n${body || '(空)'}`;
+    })
+    .join('\n\n');
+}
+
+/** 本轮提示词折叠块（第 N 步发给模型的完整消息序列） */
+function buildLlmPromptFold(ev) {
+  const msgs = ev.data?.messages;
+  const n = Array.isArray(msgs) ? msgs.length : 0;
+  return `<details class="debug-fold"><summary>第 ${ev.step} 步 · 本轮提示词（${n} 条消息）</summary><pre class="debug-pre">${esc(formatMessagesForDebug(msgs))}</pre></details>`;
+}
+
+/** 本轮 AI 完整回复折叠块（模型原始正文 + 原生工具调用） */
+function buildLlmReplyFold(ev) {
+  const content = String(ev.data?.content || '');
+  const toolCalls = ev.data?.toolCalls;
+  let text = content || '(空)';
+  if (Array.isArray(toolCalls) && toolCalls.length) {
+    text +=
+      '\n\n[tool_calls]\n' +
+      JSON.stringify(
+        toolCalls.map((t) => ({ id: t.id, name: t.name, args: t.args })),
+        null,
+        2
+      );
+  }
+  return `<details class="debug-fold"><summary>第 ${ev.step} 步 · AI 完整回复（${content ? content.length + ' 字符' : '空'}）</summary><pre class="debug-pre">${esc(text)}</pre></details>`;
+}
+
 let _thinkingItem = null;
 let _thinkBuf = ''; // 当前思考步的推理流（reasoning_content）累积
 let _replyBuf = ''; // 当前思考步的正文（content）累积
@@ -1063,6 +1175,10 @@ function renderAgentEvent(ev) {
         `<div class="think-head">第 ${ev.step} 步：思考中…</div><div class="think-stream"></div>`
       );
   break;
+    case 'llm_prompt':
+      // 每步调用模型前透出的完整提示词，仅当次展示、可折叠
+      addTrace('debug', '▾', buildLlmPromptFold(ev));
+      break;
     case 'llm_delta': {
       // 流式追加模型输出到当前思考项：区分推理流（reasoning）与正文（content）
       const piece = ev.data?.delta || '';
@@ -1091,6 +1207,8 @@ function renderAgentEvent(ev) {
         }
         finalizeThinking(text ? undefined : '（未返回思考过程）');
       }
+      // 始终追加「本轮 AI 完整回复」折叠块（正文 + 原生工具调用），便于排查模型实际输出
+      addTrace('debug', '▴', buildLlmReplyFold(ev));
       break;
     }
     case 'tool_call': {
@@ -1710,7 +1828,7 @@ function loadRuleToEditor(rule) {
   els.promptInput.value = rule.prompt || '';
 fillResult(rule);
   els.matchType.value = rule.matchType || 'all';
-  els.resultPanel.scrollIntoView({ behavior: 'smooth' });
+
   setStatus('已载入规则，修改后保存', 'ok');
 }
 
@@ -1749,6 +1867,170 @@ function sendMsg(msg) {
       resolve(resp || { ok: false });
     });
   });
+}
+
+/**
+ * 一键导出本轮任务的模型输入/输出：从 background 拉取内存里的 trace 快照，
+ * 组装成人类可读的 Markdown，触发浏览器下载，便于离线分析模型行为。
+ */
+async function onExportTrace() {
+  if (!currentTab) {
+    setStatus('请先打开一个网页', 'error');
+    return;
+  }
+  if (viewingHistory) {
+    setStatus('请先返回当前会话再导出', 'error');
+    return;
+  }
+  setStatus('正在导出分析…', '');
+  const resp = await sendMsg({ type: MSG.EXPORT_TRACE, tabId: currentTab.id });
+  if (!resp || !resp.ok) {
+    setStatus(resp?.error || '暂无模型交互记录可导出', 'error');
+    return;
+  }
+  // 补充当前模型配置，便于分析时知道是哪套后端/模型产生的这些输入输出
+  let backend = '';
+  let model = '';
+  try {
+    const cfg = await getLlmConfig();
+    backend = cfg?.backend || '';
+    model = cfg?.model || '';
+  } catch {
+    /* 忽略配置读取失败 */
+  }
+  const meta = { ...(resp.meta || {}), backend, model };
+  const markdown = buildTraceMarkdown(meta, resp.trace || []);
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  downloadText(`webmold-trace-${stamp}.md`, markdown, 'text/markdown;charset=utf-8');
+  setStatus('已导出模型交互分析', 'ok');
+}
+
+/**
+ * 导出某条历史会话的模型输入/输出。优先用会话里持久化的 trace（含完整输入输出），
+ * 老数据没有 trace 时退化为用 events 里的 llm_response（仅模型输出）。
+ * @param {object} s 历史会话对象
+ */
+function onExportHistory(s) {
+  const turns = getSessionTurns(s);
+  // 多轮：把每轮 trace 拼接到一起（step 累加保证连续）；老数据无 trace 时用 events 兜底
+  let trace = [];
+  let stepBase = 0;
+  for (const t of turns) {
+    const tr = Array.isArray(t.trace) && t.trace.length ? t.trace : historyEventsToTrace(t);
+    trace = trace.concat(tr.map((x) => ({ ...x, step: (x.step || 0) + stepBase })));
+    stepBase += tr.length;
+  }
+  const meta = {
+    domain: s.domain || '',
+    prompt: turns.map((t, i) => `[第${i + 1}轮] ${t.prompt || ''}`).join('\n') || s.prompt || '',
+    status: s.status || '',
+    startedAt: s.createdAt || 0,
+    backend: s.backend || '',
+    model: s.model || '',
+  };
+  const markdown = buildTraceMarkdown(meta, trace);
+  downloadText(
+    `webmold-history-${String(s.id || Date.now()).slice(0, 8)}.md`,
+    markdown,
+    'text/markdown;charset=utf-8'
+  );
+  setStatus('已导出该历史会话', 'ok');
+}
+
+/** 老历史数据没有持久化 trace 时，从 events 里抽取模型输入/输出作为兜底 */
+function historyEventsToTrace(s) {
+  const events = Array.isArray(s.events) ? s.events : [];
+  return events
+    .filter((ev) => ev && (ev.type === 'llm_prompt' || ev.type === 'llm_response'))
+    .map((ev) => ({ step: ev.step, type: ev.type, data: ev.data }));
+}
+
+/**
+ * 把 trace 快照渲染成 Markdown：按 step 分块，每块依次给出「模型输入（完整消息）」与「模型输出」。
+ * @param {{domain?:string,prompt?:string,status?:string,startedAt?:number,backend?:string,model?:string}} meta
+ * @param {Array<{step?:number,type:string,data?:object}>} trace
+ */
+function buildTraceMarkdown(meta, trace) {
+  const L = [];
+  L.push('# WebMold 模型交互分析');
+  L.push('');
+  L.push('## 任务信息');
+  L.push(`- 域名：${meta.domain || '-'}`);
+  L.push(`- 用户需求：${meta.prompt || '-'}`);
+  L.push(`- 状态：${meta.status || '-'}`);
+  L.push(`- 开始时间：${meta.startedAt ? new Date(meta.startedAt).toLocaleString() : '-'}`);
+  L.push(`- 模型：${meta.backend || '-'}${meta.model ? ' / ' + meta.model : ''}`);
+  L.push(`- 交互条数：${trace.length}`);
+  L.push('');
+
+  for (const t of trace) {
+    const step = t.step != null ? t.step : '?';
+    if (t.type === 'llm_prompt') {
+      L.push('---');
+      L.push(`## 第 ${step} 步 · 模型输入（完整消息）`);
+      L.push('');
+      const msgs = Array.isArray(t.data?.messages) ? t.data.messages : [];
+      L.push(`消息条数：${msgs.length}`);
+      L.push('');
+      msgs.forEach((m, i) => {
+        const role = m?.role || 'unknown';
+        L.push(`### [${i + 1}] ${role}`);
+        L.push('');
+        let content = '';
+        if (typeof m?.content === 'string') content = m.content;
+        else if (m?.content != null) content = JSON.stringify(m.content);
+        if (Array.isArray(m?.tool_calls) && m.tool_calls.length) {
+          content += (content ? '\n\n' : '') + '[tool_calls]\n' + JSON.stringify(m.tool_calls, null, 2);
+        }
+        if (role === 'tool' && m?.tool_call_id) content = `(tool_call_id=${m.tool_call_id})\n\n` + content;
+        L.push('```text');
+        L.push(content || '(空)');
+        L.push('```');
+        L.push('');
+      });
+    } else if (t.type === 'llm_response') {
+      L.push('---');
+      L.push(`## 第 ${step} 步 · 模型输出`);
+      L.push('');
+      L.push('```text');
+      L.push(String(t.data?.content || '(空)'));
+      L.push('```');
+      const toolCalls = t.data?.toolCalls;
+      if (Array.isArray(toolCalls) && toolCalls.length) {
+        L.push('');
+        L.push('工具调用（原生 tools 协议）：');
+        L.push('```json');
+        L.push(
+          JSON.stringify(
+            toolCalls.map((c) => ({ id: c?.id, name: c?.name, args: c?.args })),
+            null,
+            2
+          )
+        );
+        L.push('```');
+      }
+      L.push('');
+    }
+  }
+  return L.join('\n');
+}
+
+/**
+ * 触发浏览器下载一个文本文件（扩展页面内 a[download] 可用）。
+ * @param {string} filename
+ * @param {string} text
+ * @param {string} mime
+ */
+function downloadText(filename, text, mime) {
+  const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 init();

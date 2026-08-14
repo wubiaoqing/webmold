@@ -28,6 +28,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
@@ -100,7 +101,9 @@ body {
 
 .content {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -112,6 +115,14 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px;
+}
+/* 历史会话 / 生成结果：覆盖层浮层，浮在对话区之上，不再挤压对话内容 */
+.panel.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
 }
 
 .section-label {
@@ -238,6 +249,8 @@ body {
 
 /* ---------- 聊天区：对话 + 输入框合为一体 ---------- */
 .chat {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--panel);
@@ -418,7 +431,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 420px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 12px;
 }
@@ -679,6 +693,39 @@ body {
 }
 .trace-item.ask .ic {
   color: var(--primary);
+}
+.trace-item.debug .ic {
+  color: var(--muted);
+}
+/* 调试折叠块：本轮提示词 / AI 完整回复 */
+.debug-fold {
+  margin: 2px 0;
+  font-size: 12px;
+}
+.debug-fold summary {
+  cursor: pointer;
+  color: var(--muted);
+  user-select: none;
+  padding: 2px 0;
+  list-style-position: inside;
+}
+.debug-fold summary:hover {
+  color: var(--text);
+}
+.debug-pre {
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 420px;
+  overflow: auto;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 /* Agent 主动提问卡片 */
 .ask-wrap {
@@ -1067,4 +1114,43 @@ body {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
+
+/* ---------- 布局优化：历史/结果浮层 + 规则列表限高 ---------- */
+/* 覆盖层里历史列表不再单独限高，由浮层自身滚动 */
+.panel.overlay .history-list {
+  max-height: none;
+}
+/* 历史项导出按钮（与删除按钮并排） */
+.history-item .hi-export {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.history-item .hi-export:hover {
+  color: var(--primary);
+}
+/* 已有规则列表：常驻底部，限高并内部滚动，避免挤占对话区 */
+.rules-panel {
+  flex: 0 0 auto;
+  max-height: 40%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rules-panel .rule-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+/* 面板头部按钮组（关闭/清空等） */
+.list-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
